@@ -6,10 +6,11 @@ from qtpy.QtWidgets import (
     QApplication, QPushButton, QLayout, QGridLayout, QHBoxLayout, QVBoxLayout,
     QTreeView, QWidget, QLabel, QSizePolicy, QSpacerItem, QCheckBox,
     QSplitter, QScrollArea, QLineEdit, QStackedWidget, QMessageBox,
+    QFormLayout,
     QListWidget, QSpinBox, QProgressDialog, QFileDialog, QListWidgetItem,
     QDialog, QAbstractItemView, QButtonGroup, QRadioButton,
     QPlainTextEdit, QInputDialog,
-    QFrame,
+    QFrame, QFontComboBox,
 )
 from qtpy.QtCore import Qt, Signal, QSize, QItemSelection, QTimer
 from qtpy.QtGui import QStandardItem, QStandardItemModel, QMouseEvent, QFont, QIntValidator, QValidator, QFocusEvent
@@ -375,6 +376,90 @@ class FontExcludeDialog(OutsideClickFramelessMixin, QDialog):
             },
             key=str.casefold,
         )
+
+
+class LptxtGroupDialog(QDialog):
+    """Small dialog to add or edit a Photoshop action group.
+
+    Holds a group name (required) and an optional font. The font picker
+    mirrors the font selector on the main interface (a dropdown that
+    previews every family in its own typeface). The font is not mandatory;
+    selecting the leading 未指定 entry leaves it empty and it is simply not
+    shown in the list.
+    """
+
+    UNSET_FONT_LABEL = '（未指定）'
+
+    def __init__(self, parent: QWidget = None, name: str = '', font: str = '') -> None:
+        super().__init__(parent)
+        self.setObjectName('LptxtGroupDialog')
+        self.setWindowTitle(self.tr('Photoshop 动作分组'))
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(12)
+
+        form = QFormLayout()
+        form.setContentsMargins(0, 0, 0, 0)
+        form.setSpacing(10)
+
+        self.name_edit = QLineEdit(self)
+        self.name_edit.setObjectName('LptxtGroupNameEdit')
+        self.name_edit.setText(name)
+        self.name_edit.setPlaceholderText(self.tr('分组名称（必填）'))
+        form.addRow(self.tr('名称'), self.name_edit)
+
+        # Font picker mirroring the main interface's font dropdown. The first
+        # entry is a sentinel meaning "no font specified".
+        self.font_combo = QFontComboBox(self)
+        self.font_combo.setObjectName('LptxtGroupFontCombo')
+        self.font_combo.setEditable(False)
+        self.font_combo.setMinimumWidth(260)
+        self.font_combo.insertItem(0, self.tr(self.UNSET_FONT_LABEL))
+        self.font_combo.setCurrentIndex(0)
+        if font:
+            self.font_combo.setCurrentFont(QFont(font))
+            if self.font_combo.currentIndex() <= 0:
+                self.font_combo.setCurrentIndex(0)
+        form.addRow(self.tr('字体'), self.font_combo)
+        layout.addLayout(form)
+
+        hint = QLabel(
+            self.tr('字体非必须设置；选择「（未指定）」时该分组不会携带字体信息。'),
+            self,
+        )
+        hint.setObjectName('LptxtGroupHint')
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        layout.addStretch()
+
+        buttons = QHBoxLayout()
+        buttons.setContentsMargins(0, 0, 0, 0)
+        buttons.addStretch()
+        self.ok_button = QPushButton(self.tr('确定'), self)
+        self.cancel_button = QPushButton(self.tr('取消'), self)
+        self.ok_button.setObjectName('LptxtGroupOk')
+        self.cancel_button.setObjectName('LptxtGroupCancel')
+        self.ok_button.clicked.connect(self.accept)
+        self.cancel_button.clicked.connect(self.reject)
+        buttons.addWidget(self.ok_button)
+        buttons.addWidget(self.cancel_button)
+        layout.addLayout(buttons)
+
+        # Disable OK until a non-empty name is entered.
+        self.ok_button.setEnabled(bool(name.strip()))
+        self.name_edit.textChanged.connect(
+            lambda text: self.ok_button.setEnabled(bool(text.strip()))
+        )
+        if name:
+            self.name_edit.selectAll()
+
+    def values(self) -> Tuple[str, str]:
+        name = self.name_edit.text().strip()
+        font = ''
+        if self.font_combo.currentIndex() != 0:
+            font = self.font_combo.currentFont().family()
+        return name, font
 
 
 class ConfigSubBlock(Widget):
@@ -1618,31 +1703,48 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
     @staticmethod
     def _lptxt_label_value(item) -> str:
         """The real group name, without the display-only leading number."""
-        value = item.data(Qt.ItemDataRole.UserRole)
-        return value if isinstance(value, str) else ''
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(data, dict):
+            name = data.get("name")
+            return name if isinstance(name, str) else ''
+        return data if isinstance(data, str) else ''
 
-    def _lptxt_append_label(self, label: str) -> None:
+    @staticmethod
+    def _lptxt_label_font(item) -> str:
+        """The configured font for a group, or empty string if unset."""
+        data = item.data(Qt.ItemDataRole.UserRole)
+        if isinstance(data, dict):
+            font = data.get("font")
+            return font if isinstance(font, str) else ''
+        return ''
+
+    def _lptxt_append_label(self, name: str, font: str = '') -> None:
         item = QListWidgetItem()
-        item.setData(Qt.ItemDataRole.UserRole, label)
+        item.setData(Qt.ItemDataRole.UserRole, {"name": name, "font": font})
         self.lptxt_text_list.addItem(item)
 
     def _lptxt_refresh_label_numbers(self) -> None:
-        """Show 1-based numbers in the list without ever storing them.
+        """Show 1-based numbers and the font, never storing either.
 
-        Only ``item.text()`` carries the number; the value used for config and
-        export lives in UserRole, so the number can never leak into the txt.
+        Numbers and "字体：X" live only in ``item.text()``; the canonical
+        ``{"name", "font"}`` record used for config and export stays in
+        UserRole, so neither the index nor the font tag can leak into the txt.
         """
         for row in range(self.lptxt_text_list.count()):
             item = self.lptxt_text_list.item(row)
-            item.setText(f'{row + 1}.  {self._lptxt_label_value(item)}')
+            text = f'{row + 1}.  {self._lptxt_label_value(item)}'
+            font = self._lptxt_label_font(item)
+            if font:
+                text += f'    字体：{font}'
+            item.setText(text)
 
     def _lptxt_sync_text_labels(self) -> None:
-        labels = []
+        groups = []
         for row in range(self.lptxt_text_list.count()):
-            label = self._lptxt_label_value(self.lptxt_text_list.item(row))
-            if label:
-                labels.append(label)
-        pcfg.lptxt_text_labels = labels
+            data = self.lptxt_text_list.item(row).data(Qt.ItemDataRole.UserRole)
+            if isinstance(data, dict) and data.get("name"):
+                groups.append({"name": data["name"], "font": data.get("font", "")})
+        pcfg.lptxt_text_labels = groups
         self.save_config.emit()
 
     def on_lptxt_note_changed(self) -> None:
@@ -1652,13 +1754,13 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         pcfg.lptxt_note = self.lptxt_note_edit.toPlainText()
 
     def on_lptxt_add_text(self) -> None:
-        text, ok = QInputDialog.getText(self, '增加分组', '分组名称：')
-        if not ok:
+        dialog = LptxtGroupDialog(self)
+        if dialog.exec_() != QDialog.DialogCode.Accepted:
             return
-        text = text.strip()
-        if not text:
+        name, font = dialog.values()
+        if not name:
             return
-        self._lptxt_append_label(text)
+        self._lptxt_append_label(name, font)
         self._lptxt_refresh_label_numbers()
         self.lptxt_text_list.setCurrentRow(self.lptxt_text_list.count() - 1)
         self._lptxt_sync_text_labels()
@@ -1667,15 +1769,17 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         item = self.lptxt_text_list.currentItem()
         if item is None:
             return
-        text, ok = QInputDialog.getText(
-            self, '修改分组', '分组名称：', text=self._lptxt_label_value(item)
+        dialog = LptxtGroupDialog(
+            self,
+            name=self._lptxt_label_value(item),
+            font=self._lptxt_label_font(item),
         )
-        if not ok:
+        if dialog.exec_() != QDialog.DialogCode.Accepted:
             return
-        text = text.strip()
-        if not text:
+        name, font = dialog.values()
+        if not name:
             return
-        item.setData(Qt.ItemDataRole.UserRole, text)
+        item.setData(Qt.ItemDataRole.UserRole, {"name": name, "font": font})
         self._lptxt_refresh_label_numbers()
         self._lptxt_sync_text_labels()
 
@@ -1991,9 +2095,11 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
             labels = []
         self.lptxt_text_list.blockSignals(True)
         self.lptxt_text_list.clear()
-        for label in labels:
-            if isinstance(label, str) and label.strip():
-                self._lptxt_append_label(label)
+        for entry in labels:
+            if isinstance(entry, dict) and entry.get("name"):
+                self._lptxt_append_label(entry["name"], entry.get("font", ""))
+            elif isinstance(entry, str) and entry.strip():
+                self._lptxt_append_label(entry)
         self._lptxt_refresh_label_numbers()
         self.lptxt_text_list.blockSignals(False)
 

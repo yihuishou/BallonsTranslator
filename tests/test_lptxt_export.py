@@ -85,6 +85,22 @@ class LPTxtExportTest(unittest.TestCase):
         text = self._export(note="", text_labels=[])
         self.assertTrue(text.startswith("1,0\n-\n-\n\n>>>>>>>>[p1.png]<<<<<<<<\n"))
 
+    def test_dict_labels_use_name_and_drop_font(self):
+        # Groups may carry an optional font; the header only writes the name.
+        text = self._export(
+            note="嵌字备注",
+            text_labels=[
+                {"name": "对白", "font": "宋体"},
+                {"name": "旁白", "font": ""},
+                "注释",
+            ],
+        )
+        self.assertTrue(
+            text.startswith("1,0\n-\n对白\n旁白\n注释\n-\n嵌字备注\n")
+        )
+        self.assertNotIn("宋体", text)
+        self.assertNotIn("字体", text)
+
     def test_normalized_coordinates_keep_three_decimals(self):
         data = {
             "image_info": {"p1.png": {"width": 1000, "height": 1000}},

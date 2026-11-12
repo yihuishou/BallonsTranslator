@@ -462,7 +462,12 @@ class ProgramConfig(Config):
     spellcheck_on_source_enabled: bool = False
     # LabelPlus txt export header; defaults mirror utils/lptxt_export.py.
     lptxt_note: str = '备注'
-    lptxt_text_labels: List[str] = field(default_factory=lambda: ['框内', '框外'])
+    lptxt_text_labels: List[Dict[str, str]] = field(
+        default_factory=lambda: [
+            {'name': '框内', 'font': ''},
+            {'name': '框外', 'font': ''},
+        ]
+    )
     show_textdetector_tool: bool = True
     show_ocr_tool: bool = True
     show_translator_tool: bool = True
@@ -572,14 +577,29 @@ class ProgramConfig(Config):
             labels = config_dict['lptxt_text_labels']
             if not isinstance(labels, list):
                 LOGGER.warning(
-                    'Discard invalid lptxt_text_labels config: expected a list of strings.'
+                    'Discard invalid lptxt_text_labels config: expected a list.'
                 )
                 config_dict.pop('lptxt_text_labels')
             else:
-                config_dict['lptxt_text_labels'] = [
-                    label for label in labels
-                    if isinstance(label, str) and label.strip()
-                ]
+                # Each group is {name, font}; font is optional. Older configs
+                # stored plain strings, which map to a group with no font.
+                normalized_groups: List[Dict[str, str]] = []
+                for entry in labels:
+                    if isinstance(entry, str):
+                        if entry.strip():
+                            normalized_groups.append({'name': entry.strip(), 'font': ''})
+                    elif isinstance(entry, dict):
+                        name = entry.get('name')
+                        if not isinstance(name, str) or not name.strip():
+                            LOGGER.warning(
+                                'Discard invalid lptxt_text_labels entry: missing name.'
+                            )
+                            continue
+                        font = entry.get('font')
+                        if not isinstance(font, str):
+                            font = ''
+                        normalized_groups.append({'name': name.strip(), 'font': font})
+                config_dict['lptxt_text_labels'] = normalized_groups
         if 'lptxt_note' in config_dict and not isinstance(config_dict['lptxt_note'], str):
             LOGGER.warning('Discard invalid lptxt_note config: expected a string.')
             config_dict.pop('lptxt_note')

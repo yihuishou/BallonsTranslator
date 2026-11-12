@@ -40,16 +40,30 @@ def _single_line(value: Any) -> str:
     return " ".join(value.split())
 
 
+def _label_name(label: Any) -> str:
+    """Normalize a group entry to its header name.
+
+    A group may be a plain string (legacy) or a ``{"name", "font"}`` dict; the
+    header only uses the name. Font is configured per group in the settings UI
+    but is intentionally not written into the LabelPlus header.
+    """
+    if isinstance(label, dict):
+        name = label.get("name")
+        return name if isinstance(name, str) else ""
+    return label if isinstance(label, str) else ""
+
+
 def build_lptxt_header(
     note: Optional[str] = None,
-    text_labels: Optional[Sequence[str]] = None,
+    text_labels: Optional[Sequence[Any]] = None,
 ) -> str:
     """Build the LabelPlus group/label header from configurable values.
 
     The header has a fixed line layout (``1,0`` / ``-`` / labels / ``-`` /
     note), so multi-line user input is folded into a single line and empty
     labels are dropped. ``None`` arguments fall back to the historical
-    defaults.
+    defaults. ``text_labels`` accepts plain strings or ``{"name", "font"}``
+    dicts; only the name reaches the header.
     """
     if note is None:
         note = DEFAULT_LPTXT_NOTE
@@ -57,7 +71,7 @@ def build_lptxt_header(
         text_labels = DEFAULT_LPTXT_TEXT_LABELS
     labels: List[str] = []
     for label in text_labels:
-        cleaned = _single_line(label)
+        cleaned = _single_line(_label_name(label))
         if cleaned:
             labels.append(cleaned)
     header_lines = ["1,0", "-", *labels, "-", _single_line(note)]
@@ -152,7 +166,7 @@ def export_lptxt(
     include_font_info: bool = False,
     fallback_page_size: Optional[PageSize] = None,
     note: Optional[str] = None,
-    text_labels: Optional[Sequence[str]] = None,
+    text_labels: Optional[Sequence[Any]] = None,
 ) -> str:
     """Write a LabelPlus txt and return its path.
 
