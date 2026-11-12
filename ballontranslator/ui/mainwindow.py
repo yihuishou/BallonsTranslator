@@ -2728,7 +2728,8 @@ class MainWindow(mainwindow_cls):
         project_data = json.loads(
             json.dumps(proj.to_dict(), ensure_ascii=False, cls=TextBlkEncoder)
         )
-        include_font_info = self.titleBar.export_lptxt_font_info_action.isChecked()
+        # The menu action always writes plain translations. Font/size prefixes
+        # remain available through the command-line entry's --font-info flag.
         fallback_page_size = None
         try:
             while True:
@@ -2736,7 +2737,7 @@ class MainWindow(mainwindow_cls):
                     out_path = export_lptxt(
                         json_path,
                         project_data=project_data,
-                        include_font_info=include_font_info,
+                        include_font_info=False,
                         fallback_page_size=fallback_page_size,
                     )
                 except LPTxtPageSizeError as e:

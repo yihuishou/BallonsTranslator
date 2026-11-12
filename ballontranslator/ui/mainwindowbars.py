@@ -440,8 +440,6 @@ class TitleBar(Widget):
         # LabelPlus txt export
         exportLabelTxtAction = QAction('导出 Label TXT', self)
         self.export_lptxt_trigger = exportLabelTxtAction.triggered
-        self.export_lptxt_font_info_action = QAction('导出 Label TXT 时包含字体字号', self)
-        self.export_lptxt_font_info_action.setCheckable(True)
 
         toolsMenu = QMenu(self.toolsToolBtn)
         toolsMenu.addAction(mergeToolAction)
@@ -449,7 +447,6 @@ class TitleBar(Widget):
         toolsMenu.addAction(self.path_reorder_action)
         toolsMenu.addAction(exportLabelTxtAction)
         toolsMenu.addSeparator()
-        toolsMenu.addAction(self.export_lptxt_font_info_action)
         toolsMenu.addAction(fontExclusionAction)
         self.toolsToolBtn.setMenu(toolsMenu)
         self.toolsToolBtn.setPopupMode(QToolButton.InstantPopup)

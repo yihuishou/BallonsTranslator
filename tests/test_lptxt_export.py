@@ -53,6 +53,20 @@ class LPTxtExportTest(unittest.TestCase):
         self.assertEqual(len(block_lines(text)), 5)
         self.assertIn("\n译文A\n", text)
 
+    def test_normalized_coordinates_keep_three_decimals(self):
+        data = {
+            "image_info": {"p1.png": {"width": 1000, "height": 1000}},
+            "pages": {"p1.png": [
+                {"text": "a", "translation": "X",
+                 "xyxy": [932.5677986806743, 327.2852946258856, 1000, 1000]},
+            ]},
+        }
+        self._write(data)
+        text = self._export()
+        self.assertIn("----------------[1]----------------[0.933, 0.327, 1]\n", text)
+        self.assertNotIn("0.9325677986806743", text)
+        self.assertNotIn("0.3272852946258856", text)
+
     def test_font_info_filters_invalid_sizes(self):
         text = self._export(include_font_info=True)
         self.assertIn("{字体：思源黑体}{字号：18.0}译文A", text)
@@ -83,7 +97,7 @@ class LPTxtExportTest(unittest.TestCase):
         # 100/1000, 200/2000 for the page with image_info
         self.assertIn("----------------[1]----------------[0.1, 0.1, 1]\n", text)
         # 100/800, 200/1200 for the page relying on the fallback
-        self.assertIn("----------------[1]----------------[0.125, 0.16666666666666666, 1]\n", text)
+        self.assertIn("----------------[1]----------------[0.125, 0.167, 1]\n", text)
 
     def test_missing_page_size_raises_with_page_name(self):
         self._write({"pages": {"missing.png": BLOCKS[:1]}})

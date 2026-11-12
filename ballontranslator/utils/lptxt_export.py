@@ -16,6 +16,8 @@ LOGGER = logging.getLogger(__name__)
 
 LPTXT_HEADER = "1,0\n-\n框内\n框外\n-\n备注备注备注\n"
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".webp")
+# LabelPlus coordinates are normalized to 0..1 and rounded to 3 decimals.
+COORD_DECIMALS = 3
 
 PageSize = Tuple[int, int]
 
@@ -165,7 +167,11 @@ def export_lptxt(
                 and isinstance(coord[0], (int, float))
                 and isinstance(coord[1], (int, float))
             ):
-                normalized = [coord[0] / width, coord[1] / height, 1]
+                normalized = [
+                    round(coord[0] / width, COORD_DECIMALS),
+                    round(coord[1] / height, COORD_DECIMALS),
+                    1,
+                ]
             translation = item["translation"]
             if include_font_info:
                 translation = _font_prefix(item) + translation
