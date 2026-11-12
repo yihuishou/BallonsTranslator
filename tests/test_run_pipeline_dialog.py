@@ -485,6 +485,15 @@ class RunPipelineDialogTests(unittest.TestCase):
         self.assertTrue(all(button.isChecked() for button in module_buttons[:4]))
         self.assertFalse(module_buttons[4].isChecked())
         self.assertEqual(module_buttons[4].property('stageIndex'), 4)
+        # The module-less stage shows its name where a module selector would
+        # sit, so the row lines up with the other four.
+        proofread_activator = dialog.module_activators[4]
+        self.assertEqual(proofread_activator.label.text(), 'Proofreading')
+        self.assertIs(proofread_activator.label.property('moduleActive'), False)
+        module_buttons[4].click()
+        self.assertIs(proofread_activator.label.property('moduleActive'), True)
+        module_buttons[4].click()
+        self.assertIs(proofread_activator.label.property('moduleActive'), False)
         module_buttons[0].click()
         self.assertFalse(module_buttons[0].isChecked())
         self.assertFalse(pcfg.module.enable_detect)

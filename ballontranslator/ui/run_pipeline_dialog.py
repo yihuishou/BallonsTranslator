@@ -168,7 +168,9 @@ class PipelineStageActivator(QWidget):
     """A pipeline stage that is a plain on/off switch with no module choice.
 
     Proofreading runs a fixed model instead of a registry module, so it needs the
-    same toggle button as a module stage but no selector or config button.
+    same toggle button as a module stage but no selector or config button. The
+    stage name sits where a module selector would, so the row lines up with the
+    others instead of ending at the icon.
     """
 
     def __init__(
@@ -193,6 +195,30 @@ class PipelineStageActivator(QWidget):
             inactive_icon_name=inactive_icon_name,
         )
         layout.addWidget(self.button)
+        self.label = QLabel(text, self)
+        self.label.setObjectName('RunPipelineStageLabel')
+        self.label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred,
+        )
+        self.label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        layout.addWidget(self.label, 1)
+
+        self.button.toggled.connect(self._refresh_active_state)
+        self._refresh_active_state(self.button.isChecked())
+
+    def _refresh_active_state(self, active: bool) -> None:
+        self.label.setProperty('moduleActive', active)
+        self.label.style().unpolish(self.label)
+        self.label.style().polish(self.label)
+
+    def mousePressEvent(self, event: QMouseEvent) -> None:
+        # The label carries no text interaction, so its clicks land here: treat
+        # the whole row as the switch, like the module stages do.
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.button.setChecked(not self.button.isChecked())
+            event.accept()
+            return
+        super().mousePressEvent(event)
 
     def setModule(self, module_name: str) -> None:
         """No module to select; kept for the shared activator interface."""

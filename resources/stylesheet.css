@@ -1126,6 +1126,19 @@ QFrame#RunPipelineStages QLabel#RunPipelineModuleIcon {
     border: none;
 }
 
+QFrame#RunPipelineStages QLabel#RunPipelineStageLabel {
+    min-height: 22px;
+    border: none;
+    background-color: transparent;
+    color: @qwidgetForegroundColor;
+    font-size: 13px;
+    padding: 1px 8px;
+}
+
+QFrame#RunPipelineStages QLabel#RunPipelineStageLabel[moduleActive="false"] {
+    color: @borderColor;
+}
+
 QFrame#RunPipelineStages QAbstractButton#RunPipelineModuleButton:hover {
     background-color: rgba(30, 147, 229, 20%);
 }
