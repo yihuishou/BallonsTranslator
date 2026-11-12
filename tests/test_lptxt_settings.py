@@ -8,7 +8,7 @@ from unittest.mock import patch
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
 from qtpy.QtCore import Qt
-from qtpy.QtWidgets import QApplication, QDialog, QPlainTextEdit, QFontComboBox
+from qtpy.QtWidgets import QApplication, QDialog, QPlainTextEdit
 
 from ballontranslator.modules import codex
 from ballontranslator.ui import mainwindow as mw
@@ -345,24 +345,24 @@ class LabelTxtSettingsTest(unittest.TestCase):
         self.assertIn('[0.1, 0.2, 1]', text)
         self.assertTrue(info and not any('ERROR' in m for m in info), info)
 
-    def test_group_dialog_uses_font_dropdown(self):
+    def test_group_dialog_uses_main_font_picker(self):
         dialog = LptxtGroupDialog()
-        self.assertIsInstance(dialog.font_combo, QFontComboBox)
-        # The first entry is the "unspecified" sentinel; the dialog opens on it.
-        self.assertEqual(dialog.font_combo.currentIndex(), 0)
+        from ballontranslator.ui.text_engine.formatting.panel import FontFamilyComboBox
+        self.assertIsInstance(dialog.font_combo, FontFamilyComboBox)
+        # No font selected means empty (the font is optional).
         self.assertEqual(dialog.values(), ('', ''))
-        # Selecting a real font returns that family; the sentinel yields empty.
-        if dialog.font_combo.count() > 1:
-            dialog.font_combo.setCurrentIndex(1)
-            self.assertEqual(
-                dialog.values()[1], dialog.font_combo.currentFont().family()
-            )
+        # A non-empty name is required to enable OK.
         dialog.name_edit.setText('  ')
         self.assertFalse(dialog.ok_button.isEnabled())
         dialog.name_edit.setText('旁白')
         self.assertTrue(dialog.ok_button.isEnabled())
-        dialog.font_combo.setCurrentIndex(0)
-        self.assertEqual(dialog.values(), ('旁白', ''))
+        # Picking a font returns its storage family; clearing returns empty.
+        if dialog.font_combo.count() > 0:
+            entry = dialog.font_combo.itemData(0)
+            dialog.font_combo.set_current_family(entry.canonical_family)
+            self.assertEqual(dialog.values()[1], entry.canonical_family)
+            dialog.font_combo.set_current_family('')
+            self.assertEqual(dialog.values()[1], '')
 
 
 if __name__ == '__main__':

@@ -10,10 +10,10 @@ from qtpy.QtWidgets import (
     QListWidget, QSpinBox, QProgressDialog, QFileDialog, QListWidgetItem,
     QDialog, QAbstractItemView, QButtonGroup, QRadioButton,
     QPlainTextEdit, QInputDialog,
-    QFrame, QFontComboBox,
+    QFrame,
 )
 from qtpy.QtCore import Qt, Signal, QSize, QItemSelection, QTimer
-from qtpy.QtGui import QStandardItem, QStandardItemModel, QMouseEvent, QFont, QIntValidator, QValidator, QFocusEvent
+from qtpy.QtGui import QStandardItem, QStandardItemModel, QMouseEvent, QFont, QFontDatabase, QIntValidator, QValidator, QFocusEvent
 
 from .custom_widget import ConfigComboBox, NoBorderPushBtn, ScrollBar, Widget
 from ballontranslator.utils import shared
@@ -381,19 +381,23 @@ class FontExcludeDialog(OutsideClickFramelessMixin, QDialog):
 class LptxtGroupDialog(QDialog):
     """Small dialog to add or edit a Photoshop action group.
 
-    Holds a group name (required) and an optional font. The font picker
-    mirrors the font selector on the main interface (a dropdown that
-    previews every family in its own typeface). The font is not mandatory;
-    selecting the leading 未指定 entry leaves it empty and it is simply not
-    shown in the list.
+    Holds a group name (required) and an optional font. The font picker is the
+    same searchable combobox used on the main interface, so users can filter
+    the long font list by typing. An empty font is allowed and simply not shown
+    in the list.
     """
-
-    UNSET_FONT_LABEL = '（未指定）'
 
     def __init__(self, parent: QWidget = None, name: str = '', font: str = '') -> None:
         super().__init__(parent)
         self.setObjectName('LptxtGroupDialog')
         self.setWindowTitle(self.tr('Photoshop 动作分组'))
+
+        # Reuse the main interface's searchable font picker so the dropdown
+        # behaves identically (type-to-filter, font preview per entry).
+        from ballontranslator.ui.text_engine.formatting.panel import (
+            FontFamilyComboBox,
+            FontEntry,
+        )
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(16, 16, 16, 16)
@@ -409,23 +413,29 @@ class LptxtGroupDialog(QDialog):
         self.name_edit.setPlaceholderText(self.tr('分组名称（必填）'))
         form.addRow(self.tr('名称'), self.name_edit)
 
-        # Font picker mirroring the main interface's font dropdown. The first
-        # entry is a sentinel meaning "no font specified".
-        self.font_combo = QFontComboBox(self)
+        # Font picker mirroring the main interface's font dropdown: editable with
+        # type-to-filter search. An empty selection means "no font specified".
+        self.font_combo = FontFamilyComboBox(self)
         self.font_combo.setObjectName('LptxtGroupFontCombo')
-        self.font_combo.setEditable(False)
         self.font_combo.setMinimumWidth(260)
-        self.font_combo.insertItem(0, self.tr(self.UNSET_FONT_LABEL))
-        self.font_combo.setCurrentIndex(0)
+        registry = getattr(shared, 'FONT_REGISTRY', None)
+        if registry is not None:
+            entries = registry.entries(False, set())
+        else:
+            # Fallback when the app font registry is unavailable (e.g. tests):
+            # build minimal entries straight from the system font database.
+            entries = [
+                FontEntry(family, family, family, 'system')
+                for family in QFontDatabase.families()
+            ]
+        self.font_combo.update_font_entries(entries)
         if font:
-            self.font_combo.setCurrentFont(QFont(font))
-            if self.font_combo.currentIndex() <= 0:
-                self.font_combo.setCurrentIndex(0)
+            self.font_combo.set_current_family(font)
         form.addRow(self.tr('字体'), self.font_combo)
         layout.addLayout(form)
 
         hint = QLabel(
-            self.tr('字体非必须设置；选择「（未指定）」时该分组不会携带字体信息。'),
+            self.tr('字体非必须设置；留空时该分组不会携带字体信息。'),
             self,
         )
         hint.setObjectName('LptxtGroupHint')
@@ -456,10 +466,8 @@ class LptxtGroupDialog(QDialog):
 
     def values(self) -> Tuple[str, str]:
         name = self.name_edit.text().strip()
-        font = ''
-        if self.font_combo.currentIndex() != 0:
-            font = self.font_combo.currentFont().family()
-        return name, font
+        font = self.font_combo.current_storage_family()
+        return name, (font or '')
 
 
 class ConfigSubBlock(Widget):
