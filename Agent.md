@@ -274,7 +274,7 @@ OCR           OCRBase.run_ocr(img, blk_list) → TextBlock.text（原文）
 | [resources/](resources/) | `stylesheet.css` + `themes.json`（主题令牌）、`icons/`（SVG）、`translate/*.ts` 与编译产物 `*.qm`、`font_registry_overrides.json` |
 | [doc/](doc/) | `ui/` 文本引擎系列、`modules/llm_translator.md`、`localization.md`、`how_to_add_new_translator.md`（含中/俄版本）、`CHANGELOG*.md`、多语言 README |
 | [tests/](tests/) | pytest，覆盖文本引擎、画布生命周期、模块注册、LLM 契约、配置迁移等 |
-| [scripts/](scripts/) | `install.*`（安装）、`build_win_minimal.ps1`（Windows 便携构建）、`run_module.py`（单独调试某个模块）、`update_translation.py` / `merge_zh_translation.py`（Qt 翻译同步）、`BTjson_to_LPtxt.pyw`、`export to photoshop/` |
+| [scripts/](scripts/) | `install.*`（安装）、`build_win_minimal.ps1`（Windows 便携构建）、`run_module.py`（单独调试某个模块）、`update_translation.py` / `merge_zh_translation.py`（Qt 翻译同步）、`BTjson_to_LPtxt.py`（LabelPlus txt 导出入口，逻辑见 `ballontranslator/utils/lptxt_export.py`）、`export to photoshop/` |
 | [.github/](.github/) | Issue 模板；`workflows/release.yml` 在推送 `v*` 标签时用 `build_win_minimal.ps1` 构建并发布 Windows 包 |
 
 ---
