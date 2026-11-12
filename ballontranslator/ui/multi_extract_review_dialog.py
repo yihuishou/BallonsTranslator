@@ -1,8 +1,8 @@
 """Review multi-pass extraction disagreements block by block.
 
 The workflow never merges readings on its own: every block whose passes agree
-on nothing keeps its payload, shows a red corner badge, and waits here. Picking
-a reading applies it straight to the block's source text.
+on nothing keeps its payload, shows a red badge inside the block, and waits
+here. Picking a reading applies it straight to the block's source text.
 """
 
 from typing import Callable, List, Optional, Sequence, Tuple

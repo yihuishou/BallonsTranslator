@@ -272,7 +272,7 @@ class Canvas(QGraphicsScene):
         self._path_reorder_items: List[TextBlkItem] = []
         self._path_reorder_touched: List[TextBlkItem] = []
         self._path_reorder_last_pos: Optional[QPointF] = None
-        # A review badge press is answered here so no tool can claim the corner.
+        # A review badge press is answered here so no tool can claim it.
         self._conflict_badge_click: Optional[_ConflictBadgeItem] = None
 
         self.gv = CustomGV(self)
@@ -1325,9 +1325,9 @@ class Canvas(QGraphicsScene):
         btn = event.button()
         badge = self._conflict_badge_at(event.scenePos())
         if badge is not None and btn == Qt.MouseButton.LeftButton:
-            # The badge sits on the block's reshape corner, where handles,
-            # drawing tools, and transform controls also want the press. Give
-            # the review marker the first claim on its own pixels.
+            # The badge sits inside the block's bottom-right area, where the
+            # block's own drag/reshape handling also wants the press. Give the
+            # review marker the first claim on its own pixels.
             self._conflict_badge_click = badge
             badge.activate()
             event.accept()

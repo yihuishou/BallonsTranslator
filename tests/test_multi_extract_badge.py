@@ -78,23 +78,27 @@ class ConflictBadgeTest(unittest.TestCase):
             Qt.MouseButton.LeftButton,
         )
 
-    def test_badge_sits_on_the_bottom_right_corner(self):
+    def test_badge_sits_inside_the_bottom_right_corner(self):
         item = make_item(CONFLICT)
         badge = item._conflict_badge_item
         outline = item.geometry_controller.visual_outline_in_item()
-        corner = outline.boundingRect().bottomRight()
-        half = _ConflictBadgeItem.DIAMETER / 2
+        bounds = outline.boundingRect()
+        dot = badge.mapRectToItem(item, badge.boundingRect())
 
-        self.assertAlmostEqual(badge.pos().x(), corner.x() - half, places=1)
-        self.assertAlmostEqual(badge.pos().y(), corner.y() - half, places=1)
-        self.assertGreater(
-            badge.pos().x(),
-            outline.boundingRect().center().x(),
+        # The badge is anchored on the block's bottom-right corner and paints
+        # up and left from it, so the whole dot stays inside the block.
+        self.assertAlmostEqual(
+            badge.pos().x(), bounds.right(), places=1
         )
-        self.assertGreater(
-            badge.pos().y(),
-            outline.boundingRect().center().y(),
+        self.assertAlmostEqual(
+            badge.pos().y(), bounds.bottom(), places=1
         )
+        self.assertLessEqual(dot.right(), bounds.right() + 0.01)
+        self.assertLessEqual(dot.bottom(), bounds.bottom() + 0.01)
+        self.assertGreaterEqual(dot.left(), bounds.left() - 0.01)
+        self.assertGreaterEqual(dot.top(), bounds.top() - 0.01)
+        self.assertGreater(dot.center().x(), bounds.center().x())
+        self.assertGreater(dot.center().y(), bounds.center().y())
 
     def test_resolving_the_block_hides_the_badge(self):
         item = make_item(CONFLICT)
@@ -138,12 +142,22 @@ class ConflictBadgeTest(unittest.TestCase):
         )
 
 
+def badge_center():
+    """The dot's centre in badge coordinates.
+
+    The badge is anchored on the block's bottom-right corner and paints up and
+    left from its origin, so its own geometry lives in negative space.
+    """
+    half = _ConflictBadgeItem.DIAMETER / 2
+    return QPointF(-half - _ConflictBadgeItem.INSET, -half - _ConflictBadgeItem.INSET)
+
+
 class _FakeMouseEvent:
     """PyQt6 refuses to build scene mouse events, so mimic the two members
     the badge reads: the local position and ``accept()``."""
 
-    def __init__(self, pos=QPointF(6.0, 6.0)):
-        self._pos = QPointF(pos)
+    def __init__(self, pos=None):
+        self._pos = QPointF(pos) if pos is not None else badge_center()
         self.accepted = False
 
     def pos(self):
@@ -212,8 +226,8 @@ class ConflictBadgeClickTest(unittest.TestCase):
 class ConflictBadgeCanvasClickTest(unittest.TestCase):
     """The canvas must hand the badge its own pixels.
 
-    The badge sits on the block's bottom-right reshape corner, where the shape
-    handles and the drawing/transform paths also claim the press.
+    The badge sits inside the block's bottom-right area, where the block's
+    drag/reshape handling also claims the press.
     """
 
     @classmethod

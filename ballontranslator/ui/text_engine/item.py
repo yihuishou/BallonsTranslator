@@ -179,15 +179,18 @@ class _OrderBadgeItem(QGraphicsItem):
 class _ConflictBadgeItem(QGraphicsItem):
     """Mark a block whose multi-pass extraction readings disagree.
 
-    Drawn as a fixed-size dot straddling the block's bottom-right corner, so it
-    stays legible at any zoom and never covers the text. A left click is the
-    review entry point: it asks the owner to open the review dialog.
+    Drawn as a fixed-size dot tucked into the block's bottom-right corner, fully
+    inside the block outline so it stays legible at any zoom and reads as part
+    of the block it marks. A left click is the review entry point: it asks the
+    owner to open the review dialog.
 
     >>> _ConflictBadgeItem.DIAMETER
     15.6
     """
 
     DIAMETER = 15.6
+    # Gap between the dot and the block's right/bottom edges.
+    INSET = 2.0
     FILL_COLOR = QColor(214, 48, 49)
 
     def __init__(
@@ -221,7 +224,10 @@ class _ConflictBadgeItem(QGraphicsItem):
         self.hide()
 
     def boundingRect(self) -> QRectF:
-        return QRectF(0, 0, self.DIAMETER, self.DIAMETER)
+        # The item is anchored on the block's bottom-right corner and grows
+        # up and left, so the dot stays inside the block at any zoom.
+        size = self.DIAMETER
+        return QRectF(-size - self.INSET, -size - self.INSET, size, size)
 
     def paint(
         self,
@@ -229,6 +235,7 @@ class _ConflictBadgeItem(QGraphicsItem):
         _option: QStyleOptionGraphicsItem,
         _widget: Optional[QWidget] = None,
     ) -> None:
+        bounds = self.boundingRect()
         painter.save()
         try:
             painter.setCompositionMode(
@@ -236,28 +243,14 @@ class _ConflictBadgeItem(QGraphicsItem):
             )
             painter.setPen(Qt.PenStyle.NoPen)
             painter.setBrush(self.FILL_COLOR)
-            painter.drawEllipse(
-                QRectF(0, 0, self.DIAMETER, self.DIAMETER)
-            )
+            painter.drawEllipse(bounds)
             if self._hovered:
-                inset = 1.0
                 painter.setBrush(Qt.BrushStyle.NoBrush)
                 painter.setPen(QPen(QColor(255, 255, 255), 1.4))
-                painter.drawEllipse(
-                    QRectF(
-                        inset,
-                        inset,
-                        self.DIAMETER - 2 * inset,
-                        self.DIAMETER - 2 * inset,
-                    )
-                )
+                painter.drawEllipse(bounds.adjusted(1.0, 1.0, -1.0, -1.0))
             painter.setPen(Qt.GlobalColor.white)
             painter.setFont(self._font)
-            painter.drawText(
-                QRectF(0, 0, self.DIAMETER, self.DIAMETER),
-                Qt.AlignmentFlag.AlignCenter,
-                '!',
-            )
+            painter.drawText(bounds, Qt.AlignmentFlag.AlignCenter, '!')
         finally:
             painter.restore()
 
@@ -1406,9 +1399,10 @@ class TextBlkItem(QGraphicsTextItem):
             outline = self.geometry_controller.visual_outline_in_item()
             visible = not outline.isEmpty()
             if visible:
-                anchor = outline.boundingRect().bottomRight()
-                half = badge.DIAMETER / 2
-                badge.setPos(anchor - QPointF(half, half))
+                # The badge paints up and left from its origin, so anchoring it
+                # on the bottom-right corner keeps the whole dot inside the
+                # block instead of straddling the edge.
+                badge.setPos(outline.boundingRect().bottomRight())
         badge.setVisible(visible)
 
     def set_order_number_override(self, order_number: Optional[int]) -> None:
