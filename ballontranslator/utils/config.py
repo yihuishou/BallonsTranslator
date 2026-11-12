@@ -31,7 +31,8 @@ class RunStatus:
     FIN_OCR = 2
     FIN_INPAINT = 4
     FIN_TRANSLATE = 8
-    FIN_ALL = 15
+    FIN_PROOFREAD = 16
+    FIN_ALL = 31
 
 
 # A multi-pass extraction run compares at most this many detector/OCR pairs.
@@ -99,6 +100,9 @@ class ModuleConfig(Config):
     enable_ocr: bool = True
     enable_translate: bool = True
     enable_inpaint: bool = True
+    # Chinese proofreading stage. Runs on the stored translations of a page, so
+    # it can also be the only enabled stage when re-checking a finished project.
+    enable_proofread: bool = False
     # 是否在 OCR 后进行字体检测（默认不启用）
     ocr_font_detect: bool = False
     ocr_text_postprocess: str = OCRTextPostprocess.NONE
@@ -212,6 +216,8 @@ class ModuleConfig(Config):
             return self.enable_translate
         elif idx == 3:
             return self.enable_inpaint
+        elif idx == 4:
+            return self.enable_proofread
         else:
             raise Exception(f'not supported stage idx: {idx}')
 
@@ -221,6 +227,7 @@ class ModuleConfig(Config):
             'enable_ocr',
             'enable_translate',
             'enable_inpaint',
+            'enable_proofread',
         )
         if idx < 0 or idx >= len(stage_attrs):
             raise Exception(f'not supported stage idx: {idx}')
@@ -229,7 +236,13 @@ class ModuleConfig(Config):
         self.update_finish_code()
         
     def all_stages_disabled(self):
-        return (self.enable_detect or self.enable_ocr or self.enable_translate or self.enable_inpaint) is False
+        return (
+            self.enable_detect
+            or self.enable_ocr
+            or self.enable_translate
+            or self.enable_inpaint
+            or self.enable_proofread
+        ) is False
 
     def __post_init__(self) -> None:
         for setting_name, default in (
@@ -285,7 +298,8 @@ class ModuleConfig(Config):
         self.finish_code = self.enable_detect * RunStatus.FIN_DET + \
             self.enable_ocr * RunStatus.FIN_OCR + \
                 self.enable_translate * RunStatus.FIN_TRANSLATE + \
-                    self.enable_inpaint * RunStatus.FIN_INPAINT
+                    self.enable_inpaint * RunStatus.FIN_INPAINT + \
+                        self.enable_proofread * RunStatus.FIN_PROOFREAD
         
 
 @nested_dataclass
@@ -502,6 +516,16 @@ class ProgramConfig(Config):
     fold_textarea: bool = False
     show_source_text: bool = True
     show_trans_text: bool = True
+    show_proof_text: bool = True
+    # Chinese proofreading of translated text (ChineseErrorCorrector4-4B). The
+    # stage switch lives in module config (``enable_proofread``); these are the
+    # model settings shared by the stage and the manual page check.
+    text_correction_model_path: str = ''
+    text_correction_device: str = ''
+    text_correction_batch_size: int = 8
+    # Loading costs ~10 s and 7.5 GB of VRAM, so a whole-project run keeps the
+    # model resident; one-off page checks release it when they finish.
+    text_correction_keep_loaded: bool = True
     ocr_sublist: List = field(default_factory=lambda: list())
     restore_ocr_empty: bool = False
     pre_mt_sublist: List = field(default_factory=lambda: list())

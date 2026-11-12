@@ -241,6 +241,8 @@ class MainWindow(mainwindow_cls):
         self.export_doc_thread.fin_io.connect(self.on_fin_export_doc)
         self.import_doc_thread = ImportDocThread(self)
         self.import_doc_thread.fin_io.connect(self.on_fin_import_doc)
+        self.proofread_thread = None
+        self.proofread_model_thread = None
         self.update_thread = UpdateCheckThread()
         self.update_thread.progress_changed.connect(self.on_update_progress_changed)
         self.update_thread.update_finished.connect(self.on_update_finished)
@@ -372,6 +374,7 @@ class MainWindow(mainwindow_cls):
         self.textPanel.formatpanel.foldTextBtn.checkStateChanged.connect(self.fold_textarea)
         self.textPanel.formatpanel.sourceBtn.checkStateChanged.connect(self.show_source_text)
         self.textPanel.formatpanel.transBtn.checkStateChanged.connect(self.show_trans_text)
+        self.textPanel.formatpanel.proofBtn.checkStateChanged.connect(self.show_proof_text)
         self.textPanel.formatpanel.textstyle_panel.export_style.connect(self.export_tstyles)
         self.textPanel.formatpanel.textstyle_panel.import_style.connect(self.import_tstyles)
 
@@ -592,9 +595,11 @@ class MainWindow(mainwindow_cls):
         self.st_manager.formatpanel.foldTextBtn.setChecked(pcfg.fold_textarea)
         self.st_manager.formatpanel.transBtn.setCheckState(pcfg.show_trans_text)
         self.st_manager.formatpanel.sourceBtn.setCheckState(pcfg.show_source_text)
+        self.st_manager.formatpanel.proofBtn.setCheckState(pcfg.show_proof_text)
         self.fold_textarea(pcfg.fold_textarea)
         self.show_trans_text(pcfg.show_trans_text)
         self.show_source_text(pcfg.show_source_text)
+        self.show_proof_text(pcfg.show_proof_text)
 
         self.leftBar.run_imgtrans_clicked.connect(self.run_imgtrans)
 
@@ -1086,6 +1091,10 @@ class MainWindow(mainwindow_cls):
         self.titleBar.ps_bridge_trigger.connect(self.on_open_photoshop_bridge)
         self.titleBar.path_reorder_trigger.connect(self.on_path_reorder)
         self.titleBar.export_lptxt_trigger.connect(self.on_export_lptxt)
+        self.titleBar.proofread_page_trigger.connect(self.on_proofread_current_page)
+        self.titleBar.download_proofread_trigger.connect(
+            self.on_download_proofread_model
+        )
         self.canvas.path_reorder_mode_changed.connect(
             self.titleBar.path_reorder_action.setChecked
         )
@@ -2553,16 +2562,22 @@ class MainWindow(mainwindow_cls):
         self._extract_stage_backup = (
             pcfg.module.enable_inpaint,
             pcfg.module.enable_translate,
+            pcfg.module.enable_proofread,
         )
         pcfg.module.enable_inpaint = False
         pcfg.module.enable_translate = False
+        pcfg.module.enable_proofread = False
 
     def _end_extract_only_run(self) -> None:
         backup = self._extract_stage_backup
         if backup is None:
             return
         self._extract_stage_backup = None
-        pcfg.module.enable_inpaint, pcfg.module.enable_translate = backup
+        (
+            pcfg.module.enable_inpaint,
+            pcfg.module.enable_translate,
+            pcfg.module.enable_proofread,
+        ) = backup
 
     def on_run_imgtrans(
         self,
@@ -2584,8 +2599,10 @@ class MainWindow(mainwindow_cls):
         enable_ocr = pcfg.module.enable_ocr and not render_only
         enable_translate = pcfg.module.enable_translate and not render_only
         enable_inpaint = pcfg.module.enable_inpaint and not render_only
+        enable_proofread = pcfg.module.enable_proofread and not render_only
         all_disabled = not (
             enable_detect or enable_ocr or enable_translate or enable_inpaint
+            or enable_proofread
         )
         
         all_page_names = list(self.imgtrans_proj.pages)
@@ -2651,6 +2668,9 @@ class MainWindow(mainwindow_cls):
                         textblk.set_font_colors((0, 0, 0), (0, 0, 0))
                     if enable_translate or (all_disabled and not self._run_imgtrans_wo_textstyle_update) or enable_ocr:
                         textblk.rich_text = ''
+                    if enable_translate:
+                        # A new translation invalidates the stored proofread.
+                        textblk.proofread = ''
                     textblk.vertical = textblk.src_is_vertical
 
         self.module_manager.runImgtransPipeline(
@@ -2713,6 +2733,77 @@ class MainWindow(mainwindow_cls):
     def show_trans_text(self, show: bool):
         pcfg.show_trans_text = show
         self.textPanel.textEditList.setTransVisible(show)
+
+    def show_proof_text(self, show: bool):
+        pcfg.show_proof_text = show
+        self.textPanel.textEditList.setProofreadVisible(show)
+
+    def on_download_proofread_model(self):
+        from .proofread_thread import ProofreadModelThread
+
+        thread = self.proofread_model_thread
+        if thread is not None and thread.isRunning():
+            return
+        thread = ProofreadModelThread(pcfg.text_correction_model_path, self)
+        thread.done_ok.connect(self.on_proofread_model_ready)
+        self.proofread_model_thread = thread
+        thread.start()
+
+    def on_proofread_model_ready(self, path: str):
+        if not path:
+            create_error_dialog(
+                RuntimeError('ChineseErrorCorrector4-4B is missing.'),
+                self.tr('Failed to download the proofreading model.'),
+            )
+            return
+        pcfg.text_correction_model_path = path
+        create_info_dialog(self.tr('Proofreading model is ready: ') + path)
+
+    def on_proofread_current_page(self):
+        """Store the checker's verdict for this page in the proofread column."""
+        from .proofread_thread import ProofreadThread
+
+        thread = self.proofread_thread
+        if thread is not None and thread.isRunning():
+            return
+        page = self.imgtrans_proj.current_block_list()
+        if not page:
+            create_info_dialog(self.tr('No text block on this page.'))
+            return
+        if self.canvas.text_change_unsaved():
+            self.st_manager.updateTextBlkList()
+        texts = [blk.translation or '' for blk in page]
+        if not any(text.strip() for text in texts):
+            create_info_dialog(self.tr('Translate this page before proofreading.'))
+            return
+        thread = ProofreadThread(texts, self)
+        thread.proofread_done.connect(self.on_proofread_page_finished)
+        self.proofread_thread = thread
+        thread.start()
+
+    def on_proofread_page_finished(self, corrected):
+        page = self.imgtrans_proj.current_block_list()
+        changed = 0
+        for index, block in enumerate(page):
+            value = corrected[index] if index < len(corrected) else ''
+            value = (value or '').strip()
+            if value and value != (block.translation or '').strip():
+                block.proofread = value
+                changed += 1
+            else:
+                # Identical results are not stored, so an empty column always
+                # means "the checker found nothing to change".
+                block.proofread = ''
+        self.st_manager.apply_proofread(page)
+        if changed and not pcfg.show_proof_text:
+            self.st_manager.formatpanel.proofBtn.setCheckState(True)
+            self.show_proof_text(True)
+        if changed:
+            create_info_dialog(
+                self.tr('Proofreading finished, differing blocks: ') + str(changed)
+            )
+        else:
+            create_info_dialog(self.tr('No correction needed on this page.'))
 
     def on_export_doc(self):
         if self.canvas.text_change_unsaved():

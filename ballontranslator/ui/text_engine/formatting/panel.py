@@ -1055,7 +1055,8 @@ class FontFormatPanel(Widget):
         self.foldTextBtn = CheckableLabel(self.tr("Unfold"), self.tr("Fold"), False)
         self.sourceBtn = TextCheckerLabel(self.tr("Source"))
         self.transBtn = TextCheckerLabel(self.tr("Translation"))
-        for label in (self.foldTextBtn, self.sourceBtn, self.transBtn):
+        self.proofBtn = TextCheckerLabel(self.tr("Proofread"))
+        for label in (self.foldTextBtn, self.sourceBtn, self.transBtn, self.proofBtn):
             label.setObjectName("FontFormatActionLabel")
 
         FONTFORMAT_SPACING = 5
@@ -1104,9 +1105,11 @@ class FontFormatPanel(Widget):
         hl4.addWidget(self.foldTextBtn)
         hl4.addWidget(self.sourceBtn)
         hl4.addWidget(self.transBtn)
+        hl4.addWidget(self.proofBtn)
         hl4.setStretch(0, 1)
         hl4.setStretch(1, 1)
         hl4.setStretch(2, 1)
+        hl4.setStretch(3, 1)
         hl4.setContentsMargins(0, 5, 0, 0)
         hl4.setSpacing(0)
 

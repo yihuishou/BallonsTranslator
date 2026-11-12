@@ -118,6 +118,9 @@ class TextBlock:
     merged: bool = False
     text: List = field(default_factory = lambda : [])
     translation: str = ""
+    # Machine proofread of ``translation``. Empty whenever the checker found
+    # nothing to change, so only real corrections reach the project file.
+    proofread: str = ""
     rich_text: str = ""
     _bounding_rect: List = None
     src_is_vertical: bool = None

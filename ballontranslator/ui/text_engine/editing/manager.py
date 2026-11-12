@@ -14,7 +14,7 @@ except:
 
 from ..item import TextBlkItem, TextBlock
 from ...canvas import Canvas
-from .widgets import TransTextEdit, SourceTextEdit, TransPairWidget, TextEditListScrollArea, QVBoxLayout, Widget
+from .widgets import TransTextEdit, SourceTextEdit, ProofTextEdit, TransPairWidget, TextEditListScrollArea, QVBoxLayout, Widget
 from ballontranslator.utils.fontformat import FontFormat
 from .commands import (
     ApplyFontformatCommand,
@@ -574,6 +574,9 @@ class SceneTextManager(QObject):
         pair_widget.e_trans.redo_signal.connect(self.on_textedit_redo)
         pair_widget.e_trans.undo_signal.connect(self.on_textedit_undo)
         pair_widget.e_trans.focus_out.connect(self.on_pairw_focusout)
+        pair_widget.set_proofread_text(blk_item.blk.proofread)
+        pair_widget.e_proofread.text_changed.connect(self.on_proofread_text_changed)
+        pair_widget.e_proofread.focus_in.connect(self.on_transwidget_focus_in)
         pair_widget.drag_move.connect(self.textEditList.handle_drag_pos)
         pair_widget.pw_drop.connect(self.textEditList.on_pw_dropped)
         pair_widget.idx_edited.connect(self.textEditList.on_idx_edited)
@@ -1212,6 +1215,23 @@ class SceneTextManager(QObject):
         if joint_previous:
             self._on_merged_text_edit(blk_item)
 
+    def on_proofread_text_changed(self) -> None:
+        """Store proofread edits on the block only.
+
+        The canvas text keeps showing ``translation``; a proofread is a review
+        note until the user copies it over, so nothing here may reach
+        ``propagate_user_edit``.
+        """
+        widget = self.sender()
+        if not isinstance(widget, ProofTextEdit) or widget.suppress_change:
+            return
+        if not (0 <= widget.idx < len(self.textblk_item_list)):
+            return
+        block = self.textblk_item_list[widget.idx].blk
+        text = widget.toPlainText().strip()
+        if text != block.proofread:
+            block.proofread = text
+
     def on_propagate_textwidget_edit(
         self,
         pos: int,
@@ -1323,6 +1343,16 @@ class SceneTextManager(QObject):
         if len(cl) != 0:
             cl.sort(key=lambda x: x.idx)
 
+    def apply_proofread(self, blocks: Sequence[TextBlock]) -> None:
+        """Refresh proofread boxes from stored block values.
+
+        Only blocks whose checker result differs from the translation carry a
+        value, so the same call both shows new results and clears stale ones.
+        """
+        for index, pair_widget in enumerate(self.pairwidget_list):
+            if index < len(blocks):
+                pair_widget.set_proofread_text(blocks[index].proofread)
+
     def updateTextBlkList(self) -> None:
         self.canvas.text_move_session.cancel()
         cbl = self.imgtrans_proj.current_block_list()
@@ -1337,6 +1367,7 @@ class SceneTextManager(QObject):
                 blk_item.blk.rich_text = ''
                 blk_item.blk.translation = ''
             blk_item.blk.text = [trans_pair.e_source.toPlainText()]
+            blk_item.blk.proofread = trans_pair.e_proofread.toPlainText().strip()
             blk_item.blk._bounding_rect = blk_item.absBoundingRect()
             blk_item.updateBlkFormat()
             updated_blocks.append(blk_item.blk)

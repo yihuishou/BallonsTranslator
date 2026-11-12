@@ -654,6 +654,63 @@ class TransTextEdit(SourceTextEdit):
         event.accept()
 
 
+class ProofTextEdit(SourceTextEdit):
+    """Editable view of one block's machine proofread.
+
+    It sits beside the translation as a review note: edits are stored on the
+    TextBlock only, never propagated into the canvas text, so accepting or
+    ignoring a correction stays a deliberate user action.
+    """
+
+    is_source_text_edit = False
+    is_proofread_text_edit = True
+
+    def __init__(self, idx, parent, fold=False, *args, **kwargs):
+        super().__init__(idx, parent, fold, *args, **kwargs)
+        self.suppress_change = False
+        self.setObjectName('ProofreadTextEdit')
+        self.setPlaceholderText(self.tr('Proofread'))
+        self.setStyleSheet(
+            'QTextEdit#ProofreadTextEdit {'
+            ' border-left: 2px solid rgb(30, 147, 229); }'
+        )
+
+    def setPlainTextSilently(self, text: str):
+        """Load a stored value without reporting it as a user edit."""
+        self.suppress_change = True
+        try:
+            self.setPlainText(text)
+        finally:
+            self.suppress_change = False
+
+    def contextMenuEvent(self, event: QContextMenuEvent) -> None:
+        cursor = self.textCursor()
+        menu, quick_insert_actions = create_text_edit_context_menu(
+            self,
+            has_selection=cursor.hasSelection(),
+            can_undo=self.document().isUndoAvailable(),
+            can_redo=self.document().isRedoAvailable(),
+        )
+        action = menu.exec(event.globalPos())
+        operation = action.data() if action is not None else None
+        if action in quick_insert_actions:
+            self.insertPlainText(operation)
+        elif operation == 'undo':
+            self.undo()
+        elif operation == 'redo':
+            self.redo()
+        elif operation == 'cut':
+            self.cut()
+        elif operation == 'copy':
+            self.copy()
+        elif operation == 'paste':
+            self.paste()
+        elif operation == 'delete':
+            cursor.removeSelectedText()
+            self.setTextCursor(cursor)
+        event.accept()
+
+
 class RowIndexEditor(QLineEdit):
 
     focus_out = Signal()
@@ -752,6 +809,8 @@ class TransPairWidget(Widget):
         super().__init__(*args, **kwargs)
         self.e_source = SourceTextEdit(idx, self, fold)
         self.e_trans = TransTextEdit(idx, self, fold)
+        self.e_proofread = ProofTextEdit(idx, self, fold)
+        self.proofread_visible = True
         self.idx_label = RowIndexLabel(idx, self)
         self.idx_label.setText(str(idx + 1).zfill(2))   # showed index start from 1!
         self.submmit_idx = self.idx_label.submmit_idx.connect(self.on_idx_edited)
@@ -761,6 +820,7 @@ class TransPairWidget(Widget):
         vlayout.setAlignment(Qt.AlignTop)
         vlayout.addWidget(self.e_source)
         vlayout.addWidget(self.e_trans)
+        vlayout.addWidget(self.e_proofread)
         vlayout.addWidget(SeparatorWidget(self))
         spacing = 7
         vlayout.setSpacing(spacing)
@@ -836,6 +896,19 @@ class TransPairWidget(Widget):
             self.idx_label.setText(str(idx + 1).zfill(2))
             self.e_source.idx = idx
             self.e_trans.idx = idx
+            self.e_proofread.idx = idx
+
+    def apply_proofread_visibility(self, show: bool):
+        """Show the proofread box only where the checker stored a correction."""
+        self.proofread_visible = bool(show)
+        self.e_proofread.setVisible(
+            bool(show) and bool(self.e_proofread.toPlainText().strip())
+        )
+
+    def set_proofread_text(self, text: str):
+        """Load a stored proofread without echoing it back into the block."""
+        self.e_proofread.setPlainTextSilently(text or '')
+        self.apply_proofread_visibility(self.proofread_visible)
 
 
 class TextEditListScrollArea(QScrollArea):
@@ -871,6 +944,7 @@ class TextEditListScrollArea(QScrollArea):
 
         self.source_visible = True
         self.trans_visible = True
+        self.proofread_visible = True
 
         self.drag_to_pos: int = -1
 
@@ -1003,12 +1077,14 @@ class TextEditListScrollArea(QScrollArea):
         pairwidget.check_state_changed.connect(self.on_widget_checkstate_changed)
         pairwidget.e_trans.setVisible(self.trans_visible)
         pairwidget.e_source.setVisible(self.source_visible)
+        pairwidget.apply_proofread_visibility(self.proofread_visible)
         pairwidget.setVisible(True)
 
     def insertPairWidget(self, pairwidget: TransPairWidget, idx: int):
         self.vlayout.insertWidget(idx, pairwidget)
         pairwidget.e_trans.setVisible(self.trans_visible)
         pairwidget.e_source.setVisible(self.source_visible)
+        pairwidget.apply_proofread_visibility(self.proofread_visible)
         pairwidget.setVisible(True)
 
     def on_widget_checkstate_changed(
@@ -1154,6 +1230,7 @@ class TextEditListScrollArea(QScrollArea):
         for pw in self.pairwidget_list:
             pw.e_trans.setFold(fold)
             pw.e_source.setFold(fold)
+            pw.e_proofread.setFold(fold)
 
     def setSourceVisible(self, show: bool):
         self.source_visible = show
@@ -1164,3 +1241,8 @@ class TextEditListScrollArea(QScrollArea):
         self.trans_visible = show
         for pw in self.pairwidget_list:
             pw.e_trans.setVisible(show)
+
+    def setProofreadVisible(self, show: bool):
+        self.proofread_visible = show
+        for pw in self.pairwidget_list:
+            pw.apply_proofread_visibility(show)

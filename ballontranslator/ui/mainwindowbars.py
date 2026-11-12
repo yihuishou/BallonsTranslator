@@ -441,11 +441,20 @@ class TitleBar(Widget):
         exportLabelTxtAction = QAction('导出 Label TXT', self)
         self.export_lptxt_trigger = exportLabelTxtAction.triggered
 
+        # Chinese proofreading of translated text
+        proofreadPageAction = QAction(self.tr('Proofread Current Page'), self)
+        self.proofread_page_trigger = proofreadPageAction.triggered
+        downloadProofreadAction = QAction(self.tr('Download Proofreading Model'), self)
+        self.download_proofread_trigger = downloadProofreadAction.triggered
+
         toolsMenu = QMenu(self.toolsToolBtn)
         toolsMenu.addAction(mergeToolAction)
         toolsMenu.addAction(psBridgeAction)
         toolsMenu.addAction(self.path_reorder_action)
         toolsMenu.addAction(exportLabelTxtAction)
+        toolsMenu.addSeparator()
+        toolsMenu.addAction(proofreadPageAction)
+        toolsMenu.addAction(downloadProofreadAction)
         toolsMenu.addSeparator()
         toolsMenu.addAction(fontExclusionAction)
         self.toolsToolBtn.setMenu(toolsMenu)

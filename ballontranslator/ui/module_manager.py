@@ -169,6 +169,41 @@ def _mark_translation_finished(
     translator.on_page_translation_finished(project, page_key)
 
 
+def proofread_page_translations(project: ProjImgTrans, page_key: str) -> bool:
+    """Fill the proofread column of one page from its stored translations.
+
+    Reads committed translations rather than freshly produced ones, so the stage
+    works both right after translation and on a project translated earlier. A
+    failure leaves the page unmarked so a later run retries it.
+    """
+
+    blocks = project.pages.get(page_key) or []
+    texts = [block.translation or '' for block in blocks]
+    if any(text.strip() for text in texts):
+        try:
+            from ballontranslator.modules.text_correction import (
+                proofread_translations,
+            )
+
+            corrected = proofread_translations(
+                texts,
+                model_dir=pcfg.text_correction_model_path,
+                device=pcfg.text_correction_device,
+                batch_size=pcfg.text_correction_batch_size,
+                release_after=not pcfg.text_correction_keep_loaded,
+            )
+        except Exception as e:
+            LOGGER.error(f'Proofreading failed on page {page_key}: {e}')
+            return False
+        for block, value in zip(blocks, corrected):
+            value = (value or '').strip()
+            block.proofread = (
+                '' if value == (block.translation or '').strip() else value
+            )
+    project.update_page_progress(page_key, RunStatus.FIN_PROOFREAD)
+    return True
+
+
 class ModuleThread(QThread):
     """Worker thread that prepares and swaps one lazily selected module.
 
@@ -745,6 +780,7 @@ class ImgtransThread(QThread):
     update_ocr_progress = Signal(int)
     update_translate_progress = Signal(int)
     update_inpaint_progress = Signal(int)
+    update_proofread_progress = Signal(int)
 
     finish_blktrans_stage = Signal(str, int)
     finish_blktrans = Signal(int, list)
@@ -754,6 +790,7 @@ class ImgtransThread(QThread):
     ocr_counter = 0
     translate_counter = 0
     inpaint_counter = 0
+    proofread_counter = 0
 
     def __init__(self, 
                  textdetect_thread: TextDetectThread,
@@ -1057,6 +1094,7 @@ class ImgtransThread(QThread):
         self.ocr_counter = 0
         self.translate_counter = 0
         self.inpaint_counter = 0
+        self.proofread_counter = 0
         
         # 如果指定了pages_to_process，只处理这些页面
         all_pages = list(self.imgtrans_proj.pages.keys())
@@ -1110,7 +1148,11 @@ class ImgtransThread(QThread):
                 LOGGER.info('Image translation pipeline stopped by user')
                 break
                 
-            img = self.imgtrans_proj.read_img(imgname)
+            # Proofreading only needs stored text, so a proofread-only run must
+            # not decode every page image.
+            img = None
+            if cfg_module.enable_detect or cfg_module.enable_ocr or cfg_module.enable_inpaint:
+                img = self.imgtrans_proj.read_img(imgname)
             mask = blk_list = None
             need_save_mask = False
             blk_removed: List[TextBlock] = []
@@ -1308,6 +1350,28 @@ class ImgtransThread(QThread):
                 self.translate_counter += 1
                 self.update_translate_progress.emit(self.translate_counter)
 
+        # Proofreading is a serial pass over committed translations, so it runs
+        # after every translation path (inline, parallel, and deferred low-VRAM)
+        # and also covers pages translated in an earlier session.
+        if cfg_module.enable_proofread and not self.isStopRequested():
+            if cfg_module.enable_translate and self.parallel_trans:
+                # The translate worker produces this run's translations
+                # asynchronously; proofreading a page before the worker reaches
+                # it would store empty results as a finished stage.
+                while (
+                    self.translate_thread.finished_counter < self.num_pages
+                    and not self.isStopRequested()
+                ):
+                    self.stop_event.wait(0.1)
+            for imgname in pages_to_iterate:
+                if self.isStopRequested():
+                    LOGGER.info('Proofreading stopped by user')
+                    break
+                if not proofread_page_translations(self.imgtrans_proj, imgname):
+                    break
+                self.proofread_counter += 1
+                self.update_proofread_progress.emit(self.proofread_counter)
+
         self._emit_pipeline_stopped_if_ready(imgtrans_running=False)
 
     def detect_finished(self) -> bool:
@@ -1334,6 +1398,11 @@ class ImgtransThread(QThread):
         if self.imgtrans_proj is None or not cfg_module.enable_inpaint:
             return True
         return self.inpaint_counter == self.num_pages or not cfg_module.enable_inpaint
+
+    def proofread_finished(self) -> bool:
+        if self.imgtrans_proj is None or not cfg_module.enable_proofread:
+            return True
+        return self.proofread_counter == self.num_pages
 
     def run(self):
         try:
@@ -1367,6 +1436,8 @@ class ImgtransThread(QThread):
                 ref_counter = min(ref_counter, self.translate_thread.finished_counter)
             else:
                 ref_counter = min(ref_counter, self.translate_counter)
+        if cfg_module.enable_proofread:
+            ref_counter = min(ref_counter, self.proofread_counter)
 
         process_idx = ref_counter - 1
         # 将处理索引转换为实际页面索引
@@ -1464,6 +1535,7 @@ class ModuleManager(QObject):
         self.imgtrans_thread.update_ocr_progress.connect(self.on_update_ocr_progress)
         self.imgtrans_thread.update_translate_progress.connect(self.on_update_translate_progress)
         self.imgtrans_thread.update_inpaint_progress.connect(self.on_update_inpaint_progress)
+        self.imgtrans_thread.update_proofread_progress.connect(self.on_update_proofread_progress)
         self.imgtrans_thread.finish_blktrans_stage.connect(self.on_finish_blktrans_stage)
         self.imgtrans_thread.finish_blktrans.connect(self.on_finish_blktrans)
         self.imgtrans_thread.pipeline_stopped.connect(self.on_imgtrans_thread_stopped)
@@ -2139,6 +2211,7 @@ class ModuleManager(QObject):
         self.progress_msgbox.ocr_bar.setVisible(cfg_module.enable_ocr)
         self.progress_msgbox.translate_bar.setVisible(cfg_module.enable_translate)
         self.progress_msgbox.inpaint_bar.setVisible(cfg_module.enable_inpaint)
+        self.progress_msgbox.proofread_bar.setVisible(cfg_module.enable_proofread)
         self.progress_msgbox.zero_progress()
         self.progress_msgbox.show_fitted()
         self.imgtrans_thread.runImgtransPipeline(
@@ -2211,6 +2284,8 @@ class ModuleManager(QObject):
             self.progress_msgbox.updateTranslateProgress(progress)
         elif stage == 'inpaint':
             self.progress_msgbox.updateInpaintProgress(progress)
+        elif stage == 'proofread':
+            self.progress_msgbox.updateProofreadProgress(progress)
         else:
             raise NotImplementedError(f'Unknown stage: {stage}')
         
@@ -2242,6 +2317,9 @@ class ModuleManager(QObject):
     def on_update_inpaint_progress(self, progress: int):
         self._on_update_stage_progress('inpaint', progress, self.progress_msgbox.updateInpaintProgress)
 
+    def on_update_proofread_progress(self, progress: int):
+        self._on_update_stage_progress('proofread', progress, self.progress_msgbox.updateProofreadProgress)
+
     def progress(self):
         progress = {}
         num_pages = self.imgtrans_thread.num_pages
@@ -2253,13 +2331,16 @@ class ModuleManager(QObject):
             progress['inpaint'] = self.imgtrans_thread.inpaint_counter / num_pages
         if cfg_module.enable_translate:
             progress['translate'] = self.imgtrans_thread.translate_counter / num_pages
+        if cfg_module.enable_proofread:
+            progress['proofread'] = self.imgtrans_thread.proofread_counter / num_pages
         return progress
 
     def proj_finished(self):
         if self.imgtrans_thread.detect_finished() \
             and self.imgtrans_thread.ocr_finished() \
                 and self.imgtrans_thread.translate_finished() \
-                    and self.imgtrans_thread.inpaint_finished():
+                    and self.imgtrans_thread.inpaint_finished() \
+                        and self.imgtrans_thread.proofread_finished():
             return True
         return False
 

@@ -472,14 +472,19 @@ class RunPipelineDialogTests(unittest.TestCase):
             ['Pipeline', 'Rendering', 'Text Extraction', 'Multi-Pass Extraction'],
         )
         module_buttons = dialog.findChildren(PipelineModuleButton, 'RunPipelineModuleButton')
-        self.assertEqual(len(module_buttons), 4)
+        # Detection, OCR, Inpainting, Translation, and the module-less
+        # proofreading switch all use the same stage button.
+        self.assertEqual(len(module_buttons), 5)
         activators = dialog.findChildren(
             PipelineModuleActivator,
             'RunPipelineModuleActivator',
         )
         self.assertEqual(len(activators), 4)
         self.assertTrue(all(not activator.selector.isHidden() for activator in activators))
-        self.assertTrue(all(button.isChecked() for button in module_buttons))
+        # Proofreading is opt-in: it loads an 8 GB model on first use.
+        self.assertTrue(all(button.isChecked() for button in module_buttons[:4]))
+        self.assertFalse(module_buttons[4].isChecked())
+        self.assertEqual(module_buttons[4].property('stageIndex'), 4)
         module_buttons[0].click()
         self.assertFalse(module_buttons[0].isChecked())
         self.assertFalse(pcfg.module.enable_detect)
@@ -1353,7 +1358,10 @@ class RunPipelineDialogTests(unittest.TestCase):
         self.assertEqual(dialog.content_stack.currentIndex(), 0)
         for display_index in RunPipelineDialog.EXTRACTION_HIDDEN_STAGES:
             self.assertFalse(dialog.module_activators[display_index].isVisible())
-            self.assertFalse(dialog.settings_sections[display_index].isVisible())
+            # The proofreading stage has no settings section of its own.
+            section = dialog.settings_sections.get(display_index)
+            if section is not None:
+                self.assertFalse(section.isVisible())
         self.assertTrue(dialog.module_activators[0].isVisible())
         self.assertTrue(dialog.module_activators[1].isVisible())
         self.assertTrue(dialog.run_button.isVisible())
@@ -1372,7 +1380,9 @@ class RunPipelineDialogTests(unittest.TestCase):
         self.assertEqual(pcfg.run_pipeline_mode, 'pipeline')
         for display_index in RunPipelineDialog.EXTRACTION_HIDDEN_STAGES:
             self.assertTrue(dialog.module_activators[display_index].isVisible())
-            self.assertTrue(dialog.settings_sections[display_index].isVisible())
+            section = dialog.settings_sections.get(display_index)
+            if section is not None:
+                self.assertTrue(section.isVisible())
 
     def test_fresh_run_only_resets_and_dispatches_selected_pages(self):
         pcfg.module.set_stage_enabled(3, False)
@@ -1424,7 +1434,12 @@ class RunPipelineDialogTests(unittest.TestCase):
         self.assertEqual(calls, [((['002.png'],), {'render_only': False})])
 
         pcfg.module.set_stage_enabled(0, False)
-        project._image_info['002.png']['finish_code'] = RunStatus.FIN_ALL
+        project._image_info['002.png']['finish_code'] = (
+            RunStatus.FIN_DET
+            | RunStatus.FIN_OCR
+            | RunStatus.FIN_TRANSLATE
+            | RunStatus.FIN_INPAINT
+        )
         project.pages['002.png'] = [TextBlock(text=['second'])]
         owner.backup_blkstyles.clear()
         calls.clear()

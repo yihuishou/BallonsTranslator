@@ -74,6 +74,8 @@ from ballontranslator.modules import (
 RUN_PIPELINE_DIALOG_WIDTH = 510
 RUN_PIPELINE_SETTING_CONTROL_WIDTH = 100
 RUN_PIPELINE_GLOSSARY_DISPLAY_WIDTH = 100
+# Pipeline stage backed by a fixed model instead of a registry module.
+PROOFREAD_STAGE_TYPE = 'proofread'
 
 
 class PipelineModuleButton(QAbstractButton):
@@ -160,6 +162,43 @@ class PipelineModuleButton(QAbstractButton):
         if event.type() in (QEvent.Type.StyleChange, QEvent.Type.PaletteChange):
             self._refresh_visuals(self.isChecked())
         return super().changeEvent(event)
+
+
+class PipelineStageActivator(QWidget):
+    """A pipeline stage that is a plain on/off switch with no module choice.
+
+    Proofreading runs a fixed model instead of a registry module, so it needs the
+    same toggle button as a module stage but no selector or config button.
+    """
+
+    def __init__(
+        self,
+        text: str,
+        modality: str,
+        parent: QWidget = None,
+        active_icon_name: str = '',
+        inactive_icon_name: str = '',
+    ) -> None:
+        super().__init__(parent)
+        self.module_type = PROOFREAD_STAGE_TYPE
+        self.setObjectName('RunPipelineStageActivator')
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        self.button = PipelineModuleButton(
+            text,
+            modality,
+            self,
+            active_icon_name=active_icon_name,
+            inactive_icon_name=inactive_icon_name,
+        )
+        layout.addWidget(self.button)
+
+    def setModule(self, module_name: str) -> None:
+        """No module to select; kept for the shared activator interface."""
+
+    def refreshSelection(self) -> None:
+        """No selection state to refresh."""
 
 
 class PipelineModuleActivator(QWidget):
@@ -355,8 +394,9 @@ class RunPipelineDialog(QDialog):
     # Workflow order matches the selector and the persisted run_pipeline_mode.
     WORKFLOW_MODES = ('pipeline', 'rendering', 'extraction', 'multi_extraction')
     # Display indexes (see _build_pipeline_page) of the stages text extraction
-    # never runs: inpainting rewrites the image and translation adds target text.
-    EXTRACTION_HIDDEN_STAGES = (2, 3)
+    # never runs: inpainting rewrites the image, translation adds target text,
+    # and proofreading checks the translated text.
+    EXTRACTION_HIDDEN_STAGES = (2, 3, 4)
     translate_source_changed = Signal(str)
     translate_target_changed = Signal(str)
     module_selected = Signal(str, str)
@@ -651,6 +691,16 @@ class RunPipelineDialog(QDialog):
                 '',
                 '',
             ),
+            (
+                4,
+                PROOFREAD_STAGE_TYPE,
+                '',
+                (),
+                self.tr('Proofreading'),
+                LLM_MODALITY_TEXT,
+                '',
+                '',
+            ),
         )
         self.module_buttons = []
         self.module_activators = []
@@ -664,24 +714,34 @@ class RunPipelineDialog(QDialog):
             active_icon,
             inactive_icon,
         ) in enumerate(stage_specs):
-            activator = PipelineModuleActivator(
-                module_type,
-                module_name,
-                module_options,
-                name,
-                modality,
-                stages,
-                active_icon_name=active_icon,
-                inactive_icon_name=inactive_icon,
-            )
+            if module_type == PROOFREAD_STAGE_TYPE:
+                activator = PipelineStageActivator(
+                    name,
+                    modality,
+                    stages,
+                    active_icon_name=active_icon,
+                    inactive_icon_name=inactive_icon,
+                )
+            else:
+                activator = PipelineModuleActivator(
+                    module_type,
+                    module_name,
+                    module_options,
+                    name,
+                    modality,
+                    stages,
+                    active_icon_name=active_icon,
+                    inactive_icon_name=inactive_icon,
+                )
             button = activator.button
             button.setChecked(pcfg.module.stage_enabled(stage_index))
             button.setProperty('stageIndex', stage_index)
             button.setProperty('sectionIndex', display_index)
             button.toggled.connect(self._on_stage_button_toggled)
-            activator.module_selected.connect(self.module_selected.emit)
-            activator.llm_profile_selected.connect(self.llm_profile_selected.emit)
-            activator.config_requested.connect(self.module_config_requested.emit)
+            if isinstance(activator, PipelineModuleActivator):
+                activator.module_selected.connect(self.module_selected.emit)
+                activator.llm_profile_selected.connect(self.llm_profile_selected.emit)
+                activator.config_requested.connect(self.module_config_requested.emit)
             stage_layout.addWidget(
                 activator,
                 display_index // 2,

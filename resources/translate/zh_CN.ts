@@ -1629,6 +1629,10 @@
         <source>Unable to apply Tate-chu-yoko to this selection.</source>
         <translation>无法为当前选区应用纵中横</translation>
     </message>
+    <message>
+        <source>Proofread</source>
+        <translation>校对</translation>
+    </message>
 </context>
 <context>
     <name>FontRefreshController</name>
@@ -2372,6 +2376,10 @@
         <location filename="../../ballontranslator/ui/custom_widget/message.py" line="240"/>
         <source>trying to stop...</source>
         <translation>正在尝试停止...</translation>
+    </message>
+    <message>
+        <source>Proofreading: </source>
+        <translation>校对：</translation>
     </message>
 </context>
 <context>
@@ -3262,6 +3270,30 @@ All existing translation results will be cleared!</source>
     <message>
         <source>Continue</source>
         <translation type="vanished">继续</translation>
+    </message>
+    <message>
+        <source>Failed to download the proofreading model.</source>
+        <translation>下载校对模型失败</translation>
+    </message>
+    <message>
+        <source>Proofreading model is ready: </source>
+        <translation>校对模型已就绪：</translation>
+    </message>
+    <message>
+        <source>No text block on this page.</source>
+        <translation>当前页面没有文本块</translation>
+    </message>
+    <message>
+        <source>Translate this page before proofreading.</source>
+        <translation>请先翻译本页再进行校对</translation>
+    </message>
+    <message>
+        <source>Proofreading finished, differing blocks: </source>
+        <translation>校对完成，与译文不一致的文本块：</translation>
+    </message>
+    <message>
+        <source>No correction needed on this page.</source>
+        <translation>本页未发现需要修改的译文</translation>
     </message>
 </context>
 <context>
@@ -5831,6 +5863,10 @@ Then restart Photoshop. Explorer will now open the source file and destination l
         <source>Uppercase</source>
         <translation>全部大写</translation>
     </message>
+    <message>
+        <source>Proofreading</source>
+        <translation>校对</translation>
+    </message>
 </context>
 <context>
     <name>SecretLineEditor</name>
@@ -7480,6 +7516,18 @@ Then restart Photoshop. Explorer will now open the source file and destination l
         <source>Run without update textstyle</source>
         <translation type="vanished">Run且不覆盖已有字体样式</translation>
     </message>
+    <message>
+        <source>Proofread Current Page</source>
+        <translation>校对当前页</translation>
+    </message>
+    <message>
+        <source>Proofread Translations Automatically</source>
+        <translation>自动校对译文</translation>
+    </message>
+    <message>
+        <source>Download Proofreading Model</source>
+        <translation>下载校对模型</translation>
+    </message>
 </context>
 <context>
     <name>TorchInstallHelperDialog</name>
@@ -7825,6 +7873,13 @@ Then restart Photoshop. Explorer will now open the source file and destination l
         <location filename="../../ballontranslator/ui/text_engine/effects/cards.py" line="570"/>
         <source>Images (*.png *.jpg *.jpeg *.webp *.bmp *.jxl)</source>
         <translation>图像文件 (*.png *.jpg *.jpeg *.webp *.bmp *.jxl)</translation>
+    </message>
+</context>
+<context>
+    <name>ProofTextEdit</name>
+    <message>
+        <source>Proofread</source>
+        <translation>校对</translation>
     </message>
 </context>
 </TS>
