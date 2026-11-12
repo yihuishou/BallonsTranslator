@@ -69,3 +69,9 @@ data/dictionaries/
 custom_modules/*
 !custom_modules/put your custom modules here.txt
 !custom_modules/trans_custom_copy_source.py
+
+# Local tooling state and build scratch directories
+.codegraph/
+.workbuddy/
+build_temp/
+install_temp/
