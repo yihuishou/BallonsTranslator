@@ -234,7 +234,7 @@ Sugoi 翻译器作者: [mingshiba](https://www.patreon.com/mingshiba)
    * 详细说明见 [团子OCR说明](doc/团子OCR说明.md)
  * OCR设置项: 字体识别。把[字体识别模型（YuzuMarker.FontDetection）](https://github.com/JeffersonQin/YuzuMarker.FontDetection)下载下来放在data\models\YuzuMarker.FontDetection目录下。
   需要的三个文件分别是```data\models\YuzuMarker.FontDetection\font_dataset``` ，  ```data\models\YuzuMarker.FontDetection\name=4x-epoch=18-step=368676.ckpt```，  ```data\font_demo_cache.bin```  
-  识别到的置信率大于60%的字体名称会保存在json文件的```_detected_font_name```字段中。目前没做可视化外显，使用[脚本](scripts/BTjson_to_LPtxt.py)导出LabelPlus txt时可选带上字体字号信息，导入到其他软件（如PS/ID）嵌字用。
+  识别到的置信率大于60%的字体名称会保存在json文件的```_detected_font_name```字段中。目前没做可视化外显，可通过「工具」菜单的「导出 Label TXT」导出（勾选「导出 Label TXT 时包含字体字号」即可带上字体字号信息），也可使用[脚本](scripts/BTjson_to_LPtxt.py)命令行导出LabelPlus txt，导入到其他软件（如PS/ID）嵌字用。
 
 ### 图像修复
   * AOT 修复模型来自 manga-image-translator

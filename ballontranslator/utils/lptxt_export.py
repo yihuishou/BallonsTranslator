@@ -109,10 +109,17 @@ def export_lptxt(
     json_path: str,
     output_path: Optional[str] = None,
     *,
+    project_data: Optional[Dict[str, Any]] = None,
     include_font_info: bool = False,
     fallback_page_size: Optional[PageSize] = None,
 ) -> str:
     """Write a LabelPlus txt and return its path.
+
+    ``project_data`` lets GUI callers pass the in-memory project instead of
+    re-reading the file, so unsaved edits are exported without writing the
+    project first. It must be plain JSON-like data, i.e. the same shape as the
+    saved project JSON (``pages`` / ``image_info``). ``json_path`` is still
+    used to locate page images and to derive the default output name.
 
     Page size is resolved per page in this order: ``image_info`` -> same-named
     image file next to the JSON -> ``fallback_page_size``. Pages with a known
@@ -121,8 +128,11 @@ def export_lptxt(
     raised with the page name, letting an interactive caller ask the user and
     retry with a fallback size.
     """
-    with open(json_path, "r", encoding="utf-8") as f:
-        data = json.load(f)
+    if project_data is None:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    else:
+        data = project_data
     if not isinstance(data, dict):
         raise ValueError("项目 JSON 顶层必须是对象")
 

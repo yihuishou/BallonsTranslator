@@ -1064,6 +1064,7 @@ class MainWindow(mainwindow_cls):
         self.titleBar.merge_tool_trigger.connect(self.on_open_merge_tool)
         self.titleBar.ps_bridge_trigger.connect(self.on_open_photoshop_bridge)
         self.titleBar.path_reorder_trigger.connect(self.on_path_reorder)
+        self.titleBar.export_lptxt_trigger.connect(self.on_export_lptxt)
         self.canvas.path_reorder_mode_changed.connect(
             self.titleBar.path_reorder_action.setChecked
         )
@@ -2706,6 +2707,60 @@ class MainWindow(mainwindow_cls):
             create_info_dialog(self.tr('Text file exported to ') + self.imgtrans_proj.dump_txt_path(dump_target, suffix))
         except Exception as e:
             create_error_dialog(e, self.tr('Failed to export as TEXT file'))
+
+    def on_export_lptxt(self) -> None:
+        """Tools -> 导出 Label TXT: export a LabelPlus txt for typesetting tools."""
+        import json
+        from qtpy.QtWidgets import QInputDialog
+        from ballontranslator.utils.proj_imgtrans import TextBlkEncoder
+        from ballontranslator.utils.lptxt_export import LPTxtPageSizeError, export_lptxt
+
+        proj = self.imgtrans_proj
+        json_path = proj.proj_path
+        if not json_path or not osp.isfile(json_path):
+            create_info_dialog('请先打开或保存一个项目，再导出 Label TXT')
+            return
+
+        # Export the in-memory snapshot, so unsaved edits on the current page
+        # are included without writing the project file back to disk.
+        if self.canvas.text_change_unsaved():
+            self.st_manager.updateTextBlkList()
+        project_data = json.loads(
+            json.dumps(proj.to_dict(), ensure_ascii=False, cls=TextBlkEncoder)
+        )
+        include_font_info = self.titleBar.export_lptxt_font_info_action.isChecked()
+        fallback_page_size = None
+        try:
+            while True:
+                try:
+                    out_path = export_lptxt(
+                        json_path,
+                        project_data=project_data,
+                        include_font_info=include_font_info,
+                        fallback_page_size=fallback_page_size,
+                    )
+                except LPTxtPageSizeError as e:
+                    # One size is enough for every page whose real size is
+                    # unavailable; real image sizes still take priority.
+                    if fallback_page_size is not None:
+                        raise
+                    width, ok = QInputDialog.getInt(
+                        self, '图片尺寸',
+                        f'无法读取图片 {e.page_name} 的尺寸，请输入宽度(px)：',
+                        822, 1, 100000)
+                    if not ok:
+                        return
+                    height, ok = QInputDialog.getInt(
+                        self, '图片尺寸', '请输入高度(px)：', 1200, 1, 100000)
+                    if not ok:
+                        return
+                    fallback_page_size = (width, height)
+                    continue
+                break
+        except Exception as e:
+            create_error_dialog(e, '导出 Label TXT 失败')
+            return
+        create_info_dialog('Label TXT 已导出到：' + out_path)
 
     def _pick_txt_file(self) -> str:
         dialog = QFileDialog()

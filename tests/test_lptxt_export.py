@@ -98,6 +98,31 @@ class LPTxtExportTest(unittest.TestCase):
         self.assertTrue(out.exists())
         self.assertIn(">>>>>>>>[p1.png]<<<<<<<<\n", out.read_text(encoding="utf-8"))
 
+    def test_project_data_uses_in_memory_snapshot(self):
+        # The saved file is stale; the GUI passes its unsaved in-memory data.
+        self._write({"pages": {}})
+        data = {
+            "image_info": {"p1.png": {"width": 1000, "height": 2000}},
+            "pages": {"p1.png": [
+                {"text": "a", "translation": "内存译文", "xyxy": [100, 200, 300, 400]},
+            ]},
+        }
+        out = export_lptxt(str(self.json_path), project_data=data)
+        text = Path(out).read_text(encoding="utf-8")
+        self.assertIn("\n内存译文\n", text)
+        self.assertEqual(len(block_lines(text)), 1)
+        self.assertNotIn("译文A", text)
+
+    def test_project_data_does_not_need_the_json_file(self):
+        self.json_path.unlink()
+        out = export_lptxt(str(self.json_path), project_data=DATA)
+        self.assertTrue(Path(out).exists())
+        self.assertIn("\n译文A\n", Path(out).read_text(encoding="utf-8"))
+
+    def test_invalid_project_data_is_rejected(self):
+        with self.assertRaises(ValueError):
+            export_lptxt(str(self.json_path), project_data=["not", "a", "dict"])
+
     def test_malformed_optional_data_is_skipped(self):
         data = {
             "image_info": "not a dict",
