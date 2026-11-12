@@ -674,6 +674,47 @@ text_styles: List[FontFormat] = []
 active_format: FontFormat = None
 config_created_on_load = False
 
+
+# --- Label TXT group helpers -------------------------------------------------
+# Text blocks carry a `group` string (the name of a configured Photoshop
+# action group from `lptxt_text_labels`). An empty/unmatched name resolves to
+# the first configured group, which is the default assignment.
+def _lptxt_groups(cfg=None) -> List[Dict[str, str]]:
+    if cfg is None:
+        cfg = pcfg
+    groups = getattr(cfg, 'lptxt_text_labels', None)
+    if not isinstance(groups, list):
+        return []
+    return groups
+
+
+def first_lptxt_group_name(cfg=None) -> str:
+    """Return the name of the first Label TXT group, or '' when none exist."""
+    groups = _lptxt_groups(cfg)
+    return groups[0]['name'] if groups else ''
+
+
+def resolve_lptxt_group_name(group_name: str, cfg=None) -> str:
+    """Return ``group_name`` if it matches a configured group; otherwise the
+    first group's name (possibly '' when no groups are configured)."""
+    groups = _lptxt_groups(cfg)
+    names = [g.get('name') for g in groups]
+    if group_name in names:
+        return group_name
+    return names[0] if names else ''
+
+
+def get_lptxt_group_font(group_name: str, cfg=None) -> str:
+    """Return the configured font for a group by name, or '' if it has none
+    or the group does not exist."""
+    if not group_name:
+        return ''
+    for g in _lptxt_groups(cfg):
+        if g.get('name') == group_name:
+            font = g.get('font')
+            return font if isinstance(font, str) else ''
+    return ''
+
 def load_textstyle_from(p: str, raise_exception = False):
 
     if not osp.exists(p):

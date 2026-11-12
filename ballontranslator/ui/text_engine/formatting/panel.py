@@ -6,6 +6,7 @@ from qtpy.QtWidgets import (
     QCompleter,
     QFrame,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMenu,
     QPushButton,
@@ -864,6 +865,8 @@ class FontFamilyComboBox(QComboBox):
 
 class FontFormatPanel(Widget):
     reload_fonts_requested = Signal()
+    # Emitted when the selected text block's Label TXT group assignment changes.
+    group_changed = Signal()
     
     textblk_item: TextBlkItem = None
     text_cursor: QTextCursor = None
@@ -881,6 +884,20 @@ class FontFormatPanel(Widget):
         self.familybox.setToolTip(self.tr("Font Family"))
         self.familybox.param_changed.connect(self.on_font_family_changed)
         self.familybox.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+
+        # Label TXT group selector: assigns the selected text block to one of the
+        # configured Photoshop action groups. An empty/unknown group name
+        # resolves to the first configured group (the default assignment).
+        self.group_label = QLabel(self.tr('分组'), self)
+        self.group_label.setObjectName('LptxtGroupLabel')
+        self.group_combo = QComboBox(self)
+        self.group_combo.setObjectName('LptxtGroupCombo')
+        self.group_combo.setToolTip(self.tr('将文本框分配到 Label TXT 分组'))
+        self.group_combo.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+        )
+        self.group_combo.currentTextChanged.connect(self.on_group_changed)
+        self.refresh_group_options()
 
         self.reloadFontsButton = None
         if runtime_font_refresh_supported():
@@ -1090,6 +1107,14 @@ class FontFormatPanel(Widget):
 
         self.vlayout.addLayout(vl0)
         self.vlayout.addLayout(hl1)
+
+        group_hlayout = QHBoxLayout()
+        group_hlayout.setContentsMargins(0, 0, 0, 0)
+        group_hlayout.setSpacing(7)
+        group_hlayout.addWidget(self.group_label)
+        group_hlayout.addWidget(self.group_combo, 1)
+        self.vlayout.addLayout(group_hlayout)
+
         self.vlayout.addLayout(hl3)
         self.vlayout.addLayout(hl2)
         self.vlayout.addLayout(hl4)
@@ -1393,7 +1418,9 @@ class FontFormatPanel(Widget):
 
         if not preserve_focused_editors or not self.familybox.hasFocus():
             with QSignalBlocker(self.familybox):
-                self.familybox.set_current_family(font_format.font_family)
+                self.familybox.set_current_family(
+                    self._display_font_family(font_format)
+                )
         if (
             self.font_size_session.start_text is None
             and (not preserve_focused_editors
@@ -1505,6 +1532,78 @@ class FontFormatPanel(Widget):
             self.textstyle_panel.on_stylelabel_activated(False)
 
 
+    def _display_font_family(self, font_format: FontFormat) -> str:
+        """The family to show in the family box.
+
+        A group font overrides the block's own font for rendering, so the box
+        must show the effective family as well; otherwise the panel would
+        display a font that the canvas is not using.
+        """
+        item = self.textblk_item
+        if item is not None:
+            blk = getattr(item, 'blk', None)
+            if blk is not None:
+                override = blk.group_font_override
+                if override:
+                    return override
+        return font_format.font_family
+
+    def refresh_group_options(self) -> None:
+        """Repopulate the group combo from the configured Label TXT groups."""
+        groups = getattr(C.pcfg, 'lptxt_text_labels', None) or []
+        names = [g.get('name', '') for g in groups if g.get('name')]
+        with QSignalBlocker(self.group_combo):
+            self.group_combo.clear()
+            if names:
+                self.group_combo.addItems(names)
+        self._update_group_tooltip()
+
+    def _update_group_tooltip(self) -> None:
+        """Explain the selected group's font override in the combo tooltip."""
+        name = self.group_combo.currentText()
+        font = C.get_lptxt_group_font(name)
+        if font:
+            self.group_combo.setToolTip(
+                self.tr('分组：{name}（字体：{font}，覆盖文本默认字体）').format(
+                    name=name, font=font
+                )
+            )
+        else:
+            self.group_combo.setToolTip(self.tr('将文本框分配到 Label TXT 分组'))
+
+    def set_group_combo_for_block(self, blk) -> None:
+        """Show the block's group in the combo (defaulting to the first group)."""
+        if blk is None:
+            self.group_combo.setEnabled(False)
+            name = C.first_lptxt_group_name()
+        else:
+            self.group_combo.setEnabled(True)
+            name = C.resolve_lptxt_group_name(blk.group)
+        with QSignalBlocker(self.group_combo):
+            idx = self.group_combo.findText(name)
+            if idx < 0 and self.group_combo.count() > 0:
+                idx = 0
+            self.group_combo.setCurrentIndex(max(idx, 0))
+        self._update_group_tooltip()
+
+    def on_group_changed(self, name: str) -> None:
+        if not name or self.textblk_item is None:
+            return
+        blk = self.textblk_item.blk
+        if blk is None:
+            return
+        blk.group = name
+        # Re-apply the block's format so the group font override (if any) takes
+        # effect immediately for rendering, and reflect the effective font in the
+        # family box.
+        self.textblk_item.set_fontformat(self.textblk_item.fontformat)
+        effective = blk.effective_font_family
+        if effective:
+            with QSignalBlocker(self.familybox):
+                self.familybox.set_current_family(effective)
+        self._update_group_tooltip()
+        self.group_changed.emit()
+
     def on_active_textstyle_label_changed(self):
         '''
         merge activate textstyle into global format
@@ -1614,6 +1713,7 @@ class FontFormatPanel(Widget):
                     update_effect_panel=not transform_items,
                 )
                 self.set_globalfmt_title()
+                self.set_group_combo_for_block(None)
             if transform_items and not preserve_local_owner:
                 self.texttransform_panel.set_transform_items(transform_items)
                 self.texteffect_panel.set_effect_items(effect_items)
@@ -1630,6 +1730,7 @@ class FontFormatPanel(Widget):
                 )
                 self.texteffect_panel.set_effect_items([textblk_item])
                 self.textstyle_panel.setTitle(f'TextBlock #{textblk_item.idx}')
+                self.set_group_combo_for_block(textblk_item.blk)
 
     def _owns_widget(self, widget: Optional[QWidget]) -> bool:
         """Return whether a child or top-level popup belongs to this panel."""

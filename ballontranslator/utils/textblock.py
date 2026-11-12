@@ -125,6 +125,12 @@ class TextBlock:
     det_model: str = None
     label: str = None # ysg yolo label
 
+    # Label TXT group identifier (name of a configured Photoshop action group).
+    # Empty means "unassigned", which resolves to the first configured group.
+    # When the assigned group carries a font, that font overrides the block's
+    # own font_family at render time (see effective_font_family).
+    group: str = ''
+
     region_mask: np.ndarray = None
     region_inpaint_dict: Dict = None
 
@@ -180,6 +186,32 @@ class TextBlock:
     @font_family.setter
     def font_family(self, value: str):
         self.fontformat.font_family = value
+
+    @property
+    def effective_font_family(self) -> str:
+        """Font family used for rendering this block.
+
+        When the block belongs to a configured group that specifies a font,
+        that group font overrides the block's own ``font_family`` (live
+        override). A block with no group (or an unknown group name) resolves to
+        the first configured group; if even that has no font, the block's own
+        font_family is returned unchanged.
+        """
+        override = self.group_font_override
+        if override:
+            return override
+        return self.fontformat.font_family
+
+    @property
+    def group_font_override(self) -> str:
+        """Return the group's configured font, or '' if the group has none.
+
+        Unlike ``effective_font_family`` this does not fall back to the block's
+        own font; it reports only whether a group-level override is in effect.
+        """
+        from . import config as C
+        group = C.resolve_lptxt_group_name(self.group)
+        return C.get_lptxt_group_font(group)
 
     @property
     def font_weight(self):

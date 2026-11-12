@@ -616,6 +616,9 @@ class MainWindow(mainwindow_cls):
         self.configPanel.apply_auto_tate_chu_yoko_requested.connect(
             self.apply_auto_tate_chu_yoko_to_project
         )
+        self.configPanel.lptxt_groups_changed.connect(
+            self.on_lptxt_groups_changed
+        )
         self.on_show_only_custom_font(pcfg.let_show_only_custom_fonts_flag)
         self.font_refresh = FontRefreshController(self)
         self.font_change_detector = None
@@ -632,6 +635,9 @@ class MainWindow(mainwindow_cls):
         self.font_refresh.status_changed.connect(self.on_font_refresh_status)
         self.textPanel.formatpanel.reload_fonts_requested.connect(
             self.font_refresh.request_manual_refresh
+        )
+        self.textPanel.formatpanel.group_changed.connect(
+            lambda: self.canvas.setProjSaveState(True)
         )
 
         textblock_mode = pcfg.imgtrans_textblock
@@ -827,6 +833,18 @@ class MainWindow(mainwindow_cls):
         registry = shared.FONT_REGISTRY
         entries = registry.entries(only_custom, pcfg.excluded_fonts)
         self.textPanel.formatpanel.update_font_entries(entries)
+
+    def on_lptxt_groups_changed(self) -> None:
+        """Label TXT group definitions changed (name or font).
+
+        Refresh the group selector and re-apply group-font overrides so canvas
+        text blocks follow the new group fonts immediately.
+        """
+        self.textPanel.formatpanel.refresh_group_options()
+        for item in self.st_manager.textblk_item_list:
+            if getattr(item, 'blk', None) is None:
+                continue
+            item.set_fontformat(item.fontformat)
 
     def openDir(self, directory: str):
         try:

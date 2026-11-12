@@ -793,6 +793,9 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
     font_list_changed = Signal(bool)
     compact_vertical_punctuation_changed = Signal(bool)
     apply_auto_tate_chu_yoko_requested = Signal()
+    # Emitted when the Label TXT group definitions (names or fonts) change, so
+    # the canvas can re-apply group-font overrides to existing text blocks.
+    lptxt_groups_changed = Signal()
     show_pre_MT_keyword_window = Signal()
     show_MT_keyword_window = Signal()
     show_OCR_keyword_window = Signal()
@@ -1754,6 +1757,7 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
                 groups.append({"name": data["name"], "font": data.get("font", "")})
         pcfg.lptxt_text_labels = groups
         self.save_config.emit()
+        self.lptxt_groups_changed.emit()
 
     def on_lptxt_note_changed(self) -> None:
         # Like the other free-text settings, keep this in memory only; the

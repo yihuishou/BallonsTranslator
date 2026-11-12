@@ -206,7 +206,7 @@ OCR           OCRBase.run_ocr(img, blk_list) → TextBlock.text（原文）
 | `canvas.py` | `Canvas(QGraphicsScene)` + `CustomGV(QGraphicsView)`：场景、缩放/拖拽、图元管理、导出渲染 |
 | `module_manager.py` | **工作线程与模块调用的唯一所有者**：`ModuleThread` 及 `InpaintThread/TextDetectThread/OCRThread/TranslateThread`、`ImgtransThread`（整页流水线）、模块选择与参数变更、取消/进度信号 |
 | `drawingpanel.py` | 绘制/抹字工具面板：画笔、矩形、形状填充、工具参数与状态切换 |
-| `configpanel.py` | 设置面板（无边框窗口 + `ConfigBlock/ConfigSubBlock` 半自动表单），按 `Config` 结构生成 UI；General 分组含 `lptxt` 页（「备注」仿 CodeX 提示词的 `QPlainTextEdit` + 「Photoshop 动作分组」可增删改列表，每项含可选字体、列表显示 `序号. 名称    字体：X`；说明文字为小字且可换行；1-based 序号与字体仅显示，真实值存 `UserRole` 为 `{"name","font"}`） |
+| `configpanel.py` | 设置面板（无边框窗口 + `ConfigBlock/ConfigSubBlock` 半自动表单），按 `Config` 结构生成 UI；General 分组含 `lptxt` 页（「备注」仿 CodeX 提示词的 `QPlainTextEdit` + 「Photoshop 动作分组」可增删改列表，每项含可选字体、列表显示 `序号. 名称    字体：X`；说明文字为小字且可换行；1-based 序号与字体仅显示，真实值存 `UserRole` 为 `{"name","font"}`；分组定义变化时发 `lptxt_groups_changed` 信号） |
 | `mainwindowbars.py` | `TitleBar` / `LeftBar` / `BottomBar`：工具入口、状态指示、翻页与进度 |
 | `framelesswindow/` | `FramelessWindow`、`FramelessMoveResize`、`OutsideClickFramelessMixin`：统一无边框窗口基座 |
 | `custom_widget/` | 通用控件库：复选框、下拉框、流式布局、滑块、滚动条、消息框、`Widget/ViewWidget` 基类 |
@@ -384,6 +384,7 @@ Windows 便携包由 `scripts/build_win_minimal.ps1` 生成（CI 使用 Python 3
 | 配置项与默认值 | `utils/config.py`（`ProgramConfig` / `ModuleConfig` / `DrawPanelConfig`） |
 | 项目 JSON 结构、页/图状态 | `utils/proj_imgtrans.py`、`utils/textblock.py` |
 | LabelPlus txt 导出、头部备注/Photoshop 动作分组 | `utils/lptxt_export.py`（`build_lptxt_header`，默认备注为「备注」）、`ui/configpanel.py` 的 `lptxt` 页、`ProgramConfig.lptxt_note` / `lptxt_text_labels`（序号仅显示，不写入 txt） |
+| 文本框分组标识与分组字体覆盖 | `utils/textblock.py` 的 `TextBlock.group` / `effective_font_family` / `group_font_override`、`utils/config.py` 的 `first_lptxt_group_name` / `resolve_lptxt_group_name` / `get_lptxt_group_font`、`ui/text_engine/formatting/panel.py` 的 `FontFormatPanel.group_combo`（「分组」下拉，默认首个分组，改动写入 `blk.group` 并发 `group_changed`）、`ui/text_engine/item.py` 的 `set_fontformat`/`get_fontformat`（分组字体只覆盖渲染，不覆盖存储）、`ui/mainwindow.py:on_lptxt_groups_changed`（设置改动后批量重算） |
 | 文本排版、字体、描边特效、变换 | `ui/text_engine/` + `doc/ui/text_engine.md` |
 | 画布交互、绘制工具、抹字手势 | `ui/canvas.py`、`ui/drawingpanel.py` + `doc/ui/draw_panel.md` |
 | 流水线执行、线程、进度与取消 | `ui/module_manager.py` |

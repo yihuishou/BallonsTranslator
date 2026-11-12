@@ -317,6 +317,12 @@ class TextBlkItem(QGraphicsTextItem):
         self._resetting_ime = False
         self.blk: TextBlock = None
         self.fontformat: FontFormat = None
+        # When the block belongs to a group that specifies a font, that group
+        # font overrides the block's own font_family for rendering only. We keep
+        # the block's own font_family intact (see get_fontformat) so toggling or
+        # removing the group font restores the original. Holds the resolved
+        # override family, or None when no override is active.
+        self._group_override_family: Optional[str] = None
         self.repainting = False
         self.reshaping = False
         self.under_ctrl = False
@@ -1706,10 +1712,16 @@ class TextBlkItem(QGraphicsTextItem):
         fontformat = self.fontformat.deepcopy()
         fontformat.frgb = [color.red(), color.green(), color.blue()]
         fontformat.font_weight = font_weight_from_qt(font.weight())
-        fontformat.font_family = font_family_for_project(
-            font.family(),
-            fontformat.font_weight,
-        )
+        if self._group_override_family is not None and self.blk is not None:
+            # A group font is overriding the block's own font for display only;
+            # preserve the block's own font_family so it is not overwritten by
+            # the rendered (group) family.
+            fontformat.font_family = self.blk.fontformat.font_family
+        else:
+            fontformat.font_family = font_family_for_project(
+                font.family(),
+                fontformat.font_weight,
+            )
         if self.isEditing():
             fontformat.font_size = pt2px(font.pointSizeF())
         else:
@@ -1757,9 +1769,26 @@ class TextBlkItem(QGraphicsTextItem):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.Start)
         format = cursor.charFormat()
+
+        # Live group-font override: when the block's group specifies a font,
+        # render with that font instead of the format's own family. The stored
+        # format (and therefore the block) keeps its own family; only the
+        # rendered QFont/char format use the override.
+        render_family = ffmat.font_family
+        override_family = None
+        if self.blk is not None:
+            gfont = self.blk.group_font_override
+            if gfont and gfont != ffmat.font_family:
+                override_family = gfont
+        if override_family is not None:
+            self._group_override_family = override_family
+            render_family = override_family
+        else:
+            self._group_override_family = None
+
         font = qfont_with_family(
             self.document().defaultFont(),
-            ffmat.font_family,
+            render_family,
         )
         font.setPointSizeF(ffmat.size_pt)
         font.setHintingPreference(QFont.HintingPreference.PreferNoHinting)
