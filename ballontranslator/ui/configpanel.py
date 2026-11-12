@@ -1115,7 +1115,7 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         self.lptxt_group_block = lptxtConfigPanel.addBlockWidget(
             lptxt_text_layout, 'Photoshop 动作分组',
             'LabelPlus txt 头部的分组，可增加、修改、删除；双击列表项也可修改。\n'
-            '左侧序号从 1 开始，仅用于显示，不会写入导出文本。',
+            '左侧序号从 1 开始，即该分组在导出文本中的分组序号，会写入每个文本框的坐标末尾。',
             vertical_layout=True,
         )
         for sublock in (self.lptxt_note_block, self.lptxt_group_block):

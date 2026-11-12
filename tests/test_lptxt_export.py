@@ -125,6 +125,61 @@ class LPTxtExportTest(unittest.TestCase):
         self.assertNotIn("-0.75", text)
         self.assertEqual(text.count("{字号："), 1)
 
+    def test_group_number_is_written_into_the_coordinate_triple(self):
+        # The third value is the 1-based position of the block's group.
+        data = {
+            "image_info": {"p1.png": {"width": 1000, "height": 1000}},
+            "pages": {"p1.png": [
+                {"text": "a", "translation": "A", "xyxy": [85, 301, 100, 100],
+                 "group": "旁白"},
+                {"text": "b", "translation": "B", "xyxy": [85, 301, 100, 100],
+                 "group": "框内"},
+                {"text": "c", "translation": "C", "xyxy": [85, 301, 100, 100],
+                 "group": "框外"},
+            ]},
+        }
+        self._write(data)
+        text = self._export(
+            text_labels=[{"name": "框内", "font": ""},
+                         {"name": "旁白", "font": ""},
+                         {"name": "框外", "font": ""}]
+        )
+        self.assertIn("----------------[1]----------------[0.085, 0.301, 2]\n", text)
+        self.assertIn("----------------[2]----------------[0.085, 0.301, 1]\n", text)
+        self.assertIn("----------------[3]----------------[0.085, 0.301, 3]\n", text)
+
+    def test_unassigned_or_unknown_group_falls_back_to_the_first_one(self):
+        data = {
+            "image_info": {"p1.png": {"width": 1000, "height": 1000}},
+            "pages": {"p1.png": [
+                {"text": "a", "translation": "A", "xyxy": [85, 301, 100, 100]},
+                {"text": "b", "translation": "B", "xyxy": [85, 301, 100, 100],
+                 "group": "不存在的组"},
+                {"text": "c", "translation": "C", "xyxy": [85, 301, 100, 100],
+                 "group": 123},
+            ]},
+        }
+        self._write(data)
+        text = self._export(text_labels=["框内", "框外"])
+        self.assertEqual(text.count("[0.085, 0.301, 1]"), 3)
+
+    def test_group_number_follows_the_custom_header_order(self):
+        data = {
+            "image_info": {"p1.png": {"width": 1000, "height": 1000}},
+            "pages": {"p1.png": [
+                {"text": "a", "translation": "A", "xyxy": [85, 301, 100, 100],
+                 "group": "注释"},
+            ]},
+        }
+        self._write(data)
+        text = self._export(text_labels=["对白", "旁白", "注释"])
+        self.assertIn("----------------[1]----------------[0.085, 0.301, 3]\n", text)
+
+    def test_default_labels_keep_the_historical_group_number(self):
+        # Without a group the block belongs to the first default group.
+        text = self._export()
+        self.assertIn("----------------[1]----------------[0.1, 0.1, 1]\n", text)
+
     def test_without_font_info_keeps_plain_translations(self):
         text = self._export()
         self.assertNotIn("{字体", text)

@@ -5,7 +5,11 @@ only a thin entry point. Run without arguments for the tkinter window, or pass
 a JSON path for headless use::
 
     python scripts/BTjson_to_LPtxt.py <imgtrans_*.json> [--font-info]
+                                      [--groups 对白,旁白]
                                       [--width 1080 --height 1920] [-o out.txt]
+
+The group order given by ``--groups`` decides both the header labels and the
+group number written into every block's coordinate triple.
 """
 
 import argparse
@@ -19,14 +23,27 @@ if APP_ROOT not in sys.path:
 from ballontranslator.utils.lptxt_export import LPTxtPageSizeError, export_lptxt
 
 
+def _parse_groups(raw):
+    """Split a comma separated group list into an ordered name list."""
+    if raw is None:
+        return None
+    return [name.strip() for name in raw.split(",") if name.strip()]
+
+
 def _run_cli(argv=None) -> int:
     parser = argparse.ArgumentParser(description="把 BallonsTranslator 项目 JSON 导出为 LabelPlus txt")
     parser.add_argument("json_path", help="项目 JSON 路径（imgtrans_*.json）")
     parser.add_argument("--font-info", action="store_true", help="译文前附加识别到的字体/字号信息")
+    parser.add_argument("--groups", default=None,
+                        help="Photoshop 动作分组名称，逗号分隔（顺序即分组序号），默认使用脚本内置分组")
     parser.add_argument("--width", type=int, default=None, help="无法自动读取尺寸时使用的图片宽度")
     parser.add_argument("--height", type=int, default=None, help="无法自动读取尺寸时使用的图片高度")
     parser.add_argument("-o", "--output", default=None, help="输出 txt 路径，默认与 JSON 同目录")
     args = parser.parse_args(argv)
+
+    text_labels = _parse_groups(args.groups)
+    if args.groups is not None and not text_labels:
+        parser.error("--groups 需要至少一个分组名称")
 
     fallback_page_size = None
     if args.width is not None or args.height is not None:
@@ -40,6 +57,7 @@ def _run_cli(argv=None) -> int:
             args.output,
             include_font_info=args.font_info,
             fallback_page_size=fallback_page_size,
+            text_labels=text_labels,
         )
     except (OSError, ValueError) as e:
         print(f"导出失败：{e}", file=sys.stderr)
@@ -67,10 +85,15 @@ def _run_gui() -> None:
 
     root = tk.Tk()
     root.title("气泡翻译器翻译转lptxt")
-    root.geometry("400x200")
+    root.geometry("460x240")
 
     font_info_var = tk.BooleanVar()
-    tk.Checkbutton(root, text="导出时包含字体字号信息", variable=font_info_var).pack(pady=20)
+    tk.Checkbutton(root, text="导出时包含字体字号信息", variable=font_info_var).pack(pady=12)
+
+    # The group order defines the group number written into each block.
+    groups_var = tk.StringVar(value="框内,框外")
+    tk.Label(root, text="Photoshop 动作分组（逗号分隔，顺序即分组序号）").pack()
+    tk.Entry(root, textvariable=groups_var).pack(pady=6)
 
     def process_json():
         json_file = filedialog.askopenfilename(
@@ -78,6 +101,7 @@ def _run_gui() -> None:
         if not json_file:
             messagebox.showwarning("警告", "未选择文件")
             return
+        text_labels = _parse_groups(groups_var.get())
         # Each JSON starts fresh, so a size entered for one project never leaks
         # into the next one handled by this window.
         fallback_page_size = None
@@ -88,6 +112,7 @@ def _run_gui() -> None:
                         json_file,
                         include_font_info=font_info_var.get(),
                         fallback_page_size=fallback_page_size,
+                        text_labels=text_labels,
                     )
                 except LPTxtPageSizeError as e:
                     if fallback_page_size is not None:

@@ -53,6 +53,38 @@ def _label_name(label: Any) -> str:
     return label if isinstance(label, str) else ""
 
 
+def _label_names(text_labels: Optional[Sequence[Any]]) -> List[str]:
+    """Return the ordered group names that the header writes out.
+
+    The names are folded to single lines and empty entries are dropped, so the
+    list matches the header exactly. The position of a name in this list is
+    the group number written into each block's coordinate triple.
+    """
+    if text_labels is None:
+        text_labels = DEFAULT_LPTXT_TEXT_LABELS
+    names: List[str] = []
+    for label in text_labels:
+        cleaned = _single_line(_label_name(label))
+        if cleaned:
+            names.append(cleaned)
+    return names
+
+
+def _group_no(group_name: Any, label_names: Sequence[str]) -> int:
+    """Return the 1-based group number of a text block.
+
+    The number refers to the position of the group in the header label list.
+    An unassigned block (or one whose group is not configured) belongs to the
+    first group, matching ``resolve_lptxt_group_name``.
+    """
+    if not label_names:
+        return 1
+    name = _single_line(group_name) if isinstance(group_name, str) else ""
+    if name in label_names:
+        return label_names.index(name) + 1
+    return 1
+
+
 def build_lptxt_header(
     note: Optional[str] = None,
     text_labels: Optional[Sequence[Any]] = None,
@@ -67,14 +99,7 @@ def build_lptxt_header(
     """
     if note is None:
         note = DEFAULT_LPTXT_NOTE
-    if text_labels is None:
-        text_labels = DEFAULT_LPTXT_TEXT_LABELS
-    labels: List[str] = []
-    for label in text_labels:
-        cleaned = _single_line(_label_name(label))
-        if cleaned:
-            labels.append(cleaned)
-    header_lines = ["1,0", "-", *labels, "-", _single_line(note)]
+    header_lines = ["1,0", "-", *_label_names(text_labels), "-", _single_line(note)]
     return "\n".join(header_lines) + "\n"
 
 
@@ -185,6 +210,10 @@ def export_lptxt(
 
     ``note`` and ``text_labels`` customize the LabelPlus header; omitting them
     keeps the historical ``LPTXT_HEADER`` unchanged.
+
+    Each block is written as ``----------------[n]----------------[x, y, group]``
+    where ``group`` is the 1-based position of the block's group in the
+    header label list (a block without a group belongs to the first one).
     """
     if project_data is None:
         with open(json_path, "r", encoding="utf-8") as f:
@@ -207,6 +236,7 @@ def export_lptxt(
         pages = {}
 
     lines: List[str] = [build_lptxt_header(note, text_labels)]
+    label_names = _label_names(text_labels)
     for page_name, items in pages.items():
         width, height = _resolve_page_size(data, page_name, json_dir, fallback_page_size)
         lines.append(f">>>>>>>>[{page_name}]<<<<<<<<\n")
@@ -223,10 +253,12 @@ def export_lptxt(
                 and isinstance(coord[0], (int, float))
                 and isinstance(coord[1], (int, float))
             ):
+                # The third value is the group number of the block, i.e. the
+                # 1-based position of its group in the header label list.
                 normalized = [
                     round(coord[0] / width, COORD_DECIMALS),
                     round(coord[1] / height, COORD_DECIMALS),
-                    1,
+                    _group_no(item.get("group"), label_names),
                 ]
             translation = item["translation"]
             if include_font_info:

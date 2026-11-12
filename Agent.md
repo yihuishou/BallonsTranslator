@@ -274,7 +274,7 @@ OCR           OCRBase.run_ocr(img, blk_list) → TextBlock.text（原文）
 | [resources/](resources/) | `stylesheet.css` + `themes.json`（主题令牌）、`icons/`（SVG）、`translate/*.ts` 与编译产物 `*.qm`、`font_registry_overrides.json` |
 | [doc/](doc/) | `ui/` 文本引擎系列、`modules/llm_translator.md`、`localization.md`、`how_to_add_new_translator.md`（含中/俄版本）、`CHANGELOG*.md`、多语言 README |
 | [tests/](tests/) | pytest，覆盖文本引擎、画布生命周期、模块注册、LLM 契约、配置迁移等 |
-| [scripts/](scripts/) | `install.*`（安装）、`build_win_minimal.ps1`（Windows 便携构建）、`run_module.py`（单独调试某个模块）、`update_translation.py` / `merge_zh_translation.py`（Qt 翻译同步）、`BTjson_to_LPtxt.py`（LabelPlus txt 命令行/GUI 导出入口，逻辑见 `ballontranslator/utils/lptxt_export.py`；主程序入口为「工具」菜单的「导出 Label TXT」，输出纯译文、不含字体字号，见 `ui/mainwindowbars.py` → `ui/mainwindow.py:on_export_lptxt`，直接传内存工程数据）、`export to photoshop/` |
+| [scripts/](scripts/) | `install.*`（安装）、`build_win_minimal.ps1`（Windows 便携构建）、`run_module.py`（单独调试某个模块）、`update_translation.py` / `merge_zh_translation.py`（Qt 翻译同步）、`BTjson_to_LPtxt.py`（LabelPlus txt 命令行/GUI 导出入口，逻辑见 `ballontranslator/utils/lptxt_export.py`；命令行 `--groups` / GUI 输入框可指定分组列表，顺序即分组序号；主程序入口为「工具」菜单的「导出 Label TXT」，输出纯译文、不含字体字号，见 `ui/mainwindowbars.py` → `ui/mainwindow.py:on_export_lptxt`，直接传内存工程数据）、`export to photoshop/` |
 | [.github/](.github/) | Issue 模板；`workflows/release.yml` 在推送 `v*` 标签时用 `build_win_minimal.ps1` 构建并发布 Windows 包 |
 
 ---
@@ -383,7 +383,7 @@ Windows 便携包由 `scripts/build_win_minimal.ps1` 生成（CI 使用 Python 3
 | 全局路径、平台开关、运行时缓存 | `utils/shared.py` |
 | 配置项与默认值 | `utils/config.py`（`ProgramConfig` / `ModuleConfig` / `DrawPanelConfig`） |
 | 项目 JSON 结构、页/图状态 | `utils/proj_imgtrans.py`、`utils/textblock.py` |
-| LabelPlus txt 导出、头部备注/Photoshop 动作分组 | `utils/lptxt_export.py`（`build_lptxt_header`，默认备注为「备注」）、`ui/configpanel.py` 的 `lptxt` 页、`ProgramConfig.lptxt_note` / `lptxt_text_labels`（序号仅显示，不写入 txt） |
+| LabelPlus txt 导出、头部备注/Photoshop 动作分组 | `utils/lptxt_export.py`（`build_lptxt_header`，默认备注为「备注」；`_label_names` / `_group_no` 决定每个文本块坐标三元组末尾的分组序号）、`ui/configpanel.py` 的 `lptxt` 页、`ProgramConfig.lptxt_note` / `lptxt_text_labels`（序号即分组序号，写入 txt 的坐标三元组） |
 | 文本框分组标识与分组字体覆盖 | `utils/textblock.py` 的 `TextBlock.group` / `effective_font_family` / `group_font_override`、`utils/config.py` 的 `first_lptxt_group_name` / `resolve_lptxt_group_name` / `get_lptxt_group_font`、`ui/text_engine/formatting/panel.py` 的 `FontFormatPanel.group_buttons`（分组按钮组平铺展示全部分组，位于「对齐」行下方，无文字标签、`AdaptiveWrapLayout` 居中换行排列，当前分组高亮、点击即改分组并写入 `blk.group`，发 `group_changed`）、`ui/text_engine/item.py` 的 `set_fontformat`/`get_fontformat`（分组字体只覆盖渲染，不覆盖存储）、`ui/mainwindow.py:on_lptxt_groups_changed`（设置改动后批量重算） |
 | 文本排版、字体、描边特效、变换 | `ui/text_engine/` + `doc/ui/text_engine.md` |
 | 画布交互、绘制工具、抹字手势 | `ui/canvas.py`、`ui/drawingpanel.py` + `doc/ui/draw_panel.md` |
