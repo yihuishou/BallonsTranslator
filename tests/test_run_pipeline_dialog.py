@@ -108,10 +108,13 @@ def get_app():
 
 
 class _MainWindowHost(SimpleNamespace):
-    """Stub host that can run the dialog-entry extraction stage override."""
+    """Stub host that can run the dialog-entry stage overrides."""
 
     def _begin_extract_only_run(self) -> None:
         MainWindow._begin_extract_only_run(self)
+
+    def _begin_proofread_only_run(self) -> None:
+        MainWindow._begin_proofread_only_run(self)
 
     def _end_extract_only_run(self) -> None:
         MainWindow._end_extract_only_run(self)
@@ -469,7 +472,13 @@ class RunPipelineDialogTests(unittest.TestCase):
         self.assertEqual(selector.currentIndex(), 0)
         self.assertEqual(
             [selector.itemText(i) for i in range(selector.count())],
-            ['Pipeline', 'Rendering', 'Text Extraction', 'Multi-Pass Extraction'],
+            [
+                'Pipeline',
+                'Rendering',
+                'Text Extraction',
+                'Multi-Pass Extraction',
+                'Proofreading',
+            ],
         )
         module_buttons = dialog.findChildren(PipelineModuleButton, 'RunPipelineModuleButton')
         # Detection, OCR, Inpainting, Translation, and the module-less
@@ -1155,6 +1164,7 @@ class RunPipelineDialogTests(unittest.TestCase):
             preserve_style = False
             extract_only = False
             multi_extract = False
+            proofread_only = False
             multi_slots = []
             pages = ['page-2']
             deleted_count = 0
@@ -1183,6 +1193,9 @@ class RunPipelineDialogTests(unittest.TestCase):
 
             def is_multi_extract_mode(self):
                 return self.multi_extract
+
+            def is_proofread_mode(self):
+                return self.proofread_only
 
             def enabled_multi_extract_slots(self):
                 return self.multi_slots
@@ -1221,6 +1234,20 @@ class RunPipelineDialogTests(unittest.TestCase):
             FakeDialog.extract_only = False
 
             calls.clear()
+            FakeDialog.result = FakeDialog.RUN
+            FakeDialog.proofread_only = True
+            pcfg.module.set_stage_enabled(0, True)
+            pcfg.module.set_stage_enabled(1, True)
+            MainWindow.run_imgtrans(owner)
+            # Proofreading covers the whole project, not the pipeline page range.
+            self.assertEqual(calls, [{}])
+            # Only its own stage ran, and the switches came back afterwards.
+            self.assertTrue(pcfg.module.enable_detect)
+            self.assertTrue(pcfg.module.enable_ocr)
+            self.assertFalse(pcfg.module.enable_proofread)
+            FakeDialog.proofread_only = False
+
+            calls.clear()
             FakeDialog.result = FakeDialog.RENDER
             FakeDialog.preserve_style = True
             MainWindow.run_imgtrans(owner)
@@ -1231,7 +1258,7 @@ class RunPipelineDialogTests(unittest.TestCase):
             FakeDialog.result = 0
             MainWindow.run_imgtrans(owner)
             self.assertEqual(calls, [])
-            self.assertEqual(FakeDialog.deleted_count, 5)
+            self.assertEqual(FakeDialog.deleted_count, 6)
 
     def test_view_actions_only_control_bottom_bar_visibility(self):
         window = QMainWindow()
@@ -1354,6 +1381,53 @@ class RunPipelineDialogTests(unittest.TestCase):
         self.assertEqual(dialog.workflow_selector.currentText(), 'Pipeline')
         self.assertEqual(pcfg.run_pipeline_mode, 'automation')
         dialog.close()
+
+    def test_proofread_workflow_shows_its_own_page(self):
+        dialog = RunPipelineDialog()
+        dialog.show()
+        self.addCleanup(dialog.close)
+
+        dialog.workflow_selector.setCurrentIndex(4)
+
+        self.assertTrue(dialog.is_proofread_mode())
+        self.assertFalse(dialog.is_extraction_mode())
+        self.assertEqual(pcfg.run_pipeline_mode, 'proofread')
+        self.assertEqual(dialog.content_stack.currentIndex(), 3)
+        self.assertTrue(dialog.run_button.isVisible())
+        # Continue resumes unfinished stages; proofreading has nothing to resume.
+        self.assertFalse(dialog.continue_button.isVisible())
+        self.assertFalse(dialog.render_button.isVisible())
+        self.assertEqual(dialog.run_button.text(), 'Start Proofreading')
+
+    def test_proofread_workflow_counts_translated_blocks(self):
+        project = SimpleNamespace(
+            pages={
+                'p1': [SimpleNamespace(translation='我跟我朋友去。')],
+                'p2': [SimpleNamespace(translation='   ')],
+                'p3': [],
+            },
+            get_page_progress=lambda page: False,
+        )
+        dialog = RunPipelineDialog(project=project)
+        dialog.show()
+        self.addCleanup(dialog.close)
+
+        dialog.workflow_selector.setCurrentIndex(4)
+
+        self.assertEqual(dialog._proofread_targets(), (3, 1, 1))
+        self.assertIn('1', dialog.proofread_stats_label.text())
+        self.assertTrue(dialog.run_button.isEnabled())
+
+        empty = RunPipelineDialog(
+            project=SimpleNamespace(
+                pages={'p1': []},
+                get_page_progress=lambda page: False,
+            )
+        )
+        empty.show()
+        self.addCleanup(empty.close)
+        empty.workflow_selector.setCurrentIndex(4)
+        self.assertFalse(empty.run_button.isEnabled())
 
     def test_text_extraction_workflow_hides_image_rewriting_stages(self):
         dialog = RunPipelineDialog()

@@ -418,7 +418,13 @@ class RunPipelineDialog(QDialog):
     CONTINUE = 2
     RENDER = 3
     # Workflow order matches the selector and the persisted run_pipeline_mode.
-    WORKFLOW_MODES = ('pipeline', 'rendering', 'extraction', 'multi_extraction')
+    WORKFLOW_MODES = (
+        'pipeline',
+        'rendering',
+        'extraction',
+        'multi_extraction',
+        'proofread',
+    )
     # Display indexes (see _build_pipeline_page) of the stages text extraction
     # never runs: inpainting rewrites the image, translation adds target text,
     # and proofreading checks the translated text.
@@ -483,6 +489,7 @@ class RunPipelineDialog(QDialog):
             self.tr('Rendering'),
             self.tr('Text Extraction'),
             self.tr('Multi-Pass Extraction'),
+            self.tr('Proofreading'),
         ))
         pipeline_mode = str(pcfg.run_pipeline_mode).lower()
         mode_indexes = {
@@ -505,6 +512,7 @@ class RunPipelineDialog(QDialog):
         self.content_stack.addWidget(self._build_pipeline_page())
         self.content_stack.addWidget(self._build_rendering_page())
         self.content_stack.addWidget(self._build_multi_extract_page())
+        self.content_stack.addWidget(self._build_proofread_page())
 
         self.content_dock = QDockWidget(surface)
         self.content_dock.setObjectName('RunPipelineContentDock')
@@ -1795,6 +1803,101 @@ class RunPipelineDialog(QDialog):
         finished_pages = [bool(self.project.get_page_progress(page)) for page in pages]
         self.page_range_progress.set_finished_pages(finished_pages)
 
+    def _build_proofread_page(self) -> QWidget:
+        page = QWidget(self)
+        page.setObjectName('RunPipelineProofreadPage')
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(0, 12, 0, 0)
+        layout.setSpacing(10)
+
+        hint = QLabel(
+            self.tr(
+                'Check the translations already stored in this project, '
+                'including text imported from outside. Detection, OCR, '
+                'translation, and inpainting are skipped, so the page images '
+                'stay untouched.'
+            ),
+            page,
+        )
+        hint.setObjectName('RunPipelineProofreadHint')
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self.proofread_stats_label = QLabel('', page)
+        self.proofread_stats_label.setObjectName('RunPipelineProofreadStats')
+        self.proofread_stats_label.setWordWrap(True)
+        layout.addWidget(self.proofread_stats_label)
+
+        self._add_section_divider(layout, self.tr('Settings'), show_line=False)
+
+        setting_row = QWidget(page)
+        setting_row.setObjectName('RunPipelineProofreadSetting')
+        setting_layout = QHBoxLayout(setting_row)
+        setting_layout.setContentsMargins(2, 2, 2, 2)
+        setting_layout.setSpacing(7)
+        self.proofread_keep_loaded_checker = QCheckBox(setting_row)
+        self.proofread_keep_loaded_checker.setObjectName(
+            'RunPipelineKeepProofreadModel'
+        )
+        self.proofread_keep_loaded_checker.setChecked(
+            pcfg.text_correction_keep_loaded
+        )
+        self.proofread_keep_loaded_checker.toggled.connect(
+            self._on_proofread_keep_loaded_changed
+        )
+        setting_layout.addWidget(self.proofread_keep_loaded_checker)
+        setting_label = QLabel(
+            self.tr('Keep the model loaded after the run'), setting_row
+        )
+        setting_label.setObjectName('RunPipelineProofreadSettingLabel')
+        setting_layout.addWidget(setting_label)
+        setting_layout.addStretch()
+        layout.addWidget(setting_row)
+
+        layout.addStretch()
+        return page
+
+    def _proofread_targets(self):
+        """Count what the proofreading workflow would check.
+
+        Returns ``(pages, translated pages, translated blocks)``; imported
+        translations live in ``TextBlock.translation``, so the same count
+        covers text produced here and text brought in from outside.
+        """
+        pages = getattr(self.project, 'pages', None) or {}
+        translated_pages = 0
+        translated_blocks = 0
+        for blocks in pages.values():
+            count = sum(
+                1
+                for block in (blocks or [])
+                if (getattr(block, 'translation', '') or '').strip()
+            )
+            if count:
+                translated_pages += 1
+            translated_blocks += count
+        return len(pages), translated_pages, translated_blocks
+
+    def _refresh_proofread_stats(self) -> None:
+        _, translated_pages, translated_blocks = self._proofread_targets()
+        if translated_blocks:
+            self.proofread_stats_label.setText(
+                self.tr('%d pages to proofread (%d translated blocks)')
+                % (translated_pages, translated_blocks)
+            )
+            self.run_button.setEnabled(True)
+        else:
+            self.proofread_stats_label.setText(
+                self.tr(
+                    'This project has no translated text yet. Import or '
+                    'translate it first.'
+                )
+            )
+            self.run_button.setEnabled(False)
+
+    def _on_proofread_keep_loaded_changed(self, checked: bool) -> None:
+        pcfg.text_correction_keep_loaded = bool(checked)
+
     def _build_rendering_page(self) -> QWidget:
         page = QWidget(self)
         page.setObjectName('RunPipelineRenderingPage')
@@ -1832,16 +1935,27 @@ class RunPipelineDialog(QDialog):
         rendering = index == 1
         extract_only = index == 2
         multi_extract = index == 3
+        proofread = index == 4
         if persist:
             pcfg.run_pipeline_mode = self.WORKFLOW_MODES[index]
-        stack_index = 1 if rendering else (2 if multi_extract else 0)
+        stack_index = {1: 1, 3: 2, 4: 3}.get(index, 0)
         self.content_stack.setCurrentIndex(stack_index)
         self._apply_stage_visibility(extract_only)
         self.run_button.setVisible(not rendering)
-        self.continue_button.setVisible(not rendering and not multi_extract)
+        self.continue_button.setVisible(
+            not rendering and not multi_extract and not proofread
+        )
         self.render_button.setVisible(rendering)
         self.render_button.setDefault(rendering)
-        self.continue_button.setDefault(not rendering)
+        self.continue_button.setDefault(not rendering and not proofread)
+        self.run_button.setDefault(proofread)
+        self.run_button.setText(
+            self.tr('Start Proofreading') if proofread else self.tr('Run')
+        )
+        if proofread:
+            self._refresh_proofread_stats()
+        else:
+            self.run_button.setEnabled(True)
         self._fit_to_current_workflow()
 
     def _apply_stage_visibility(self, extract_only: bool) -> None:
@@ -1877,6 +1991,14 @@ class RunPipelineDialog(QDialog):
         'multi_extraction'
         """
         return self.workflow_selector.currentIndex() == 3
+
+    def is_proofread_mode(self) -> bool:
+        """True when the proofreading-only workflow is selected.
+
+        >>> RunPipelineDialog.WORKFLOW_MODES[4]
+        'proofread'
+        """
+        return self.workflow_selector.currentIndex() == 4
 
     def _on_render_without_text_style_update_changed(self, checked: bool):
         pcfg.render_without_text_style_update = checked

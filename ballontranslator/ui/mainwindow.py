@@ -131,6 +131,17 @@ class PageListView(QListWidget):
 
 mainwindow_cls = Widget if shared.HEADLESS else FramelessWindow
 
+# Every stage switch a workflow can override for a single run. Saving and
+# restoring the same set keeps one workflow's override from leaking into the
+# next run.
+STAGE_FLAG_NAMES = (
+    'enable_detect',
+    'enable_ocr',
+    'enable_inpaint',
+    'enable_translate',
+    'enable_proofread',
+)
+
 
 class MainWindow(mainwindow_cls):
 
@@ -2324,11 +2335,18 @@ class MainWindow(mainwindow_cls):
                 )
                 return
             extract_only = dialog.is_extraction_mode()
+            proofread_only = dialog.is_proofread_mode()
             if extract_only:
                 self._begin_extract_only_run()
+            elif proofread_only:
+                self._begin_proofread_only_run()
             try:
                 if result == RunPipelineDialog.CONTINUE:
                     self.on_run_imgtrans(continue_mode=True)
+                elif proofread_only:
+                    # Covers the whole project: an imported translation has no
+                    # "unfinished" pages to continue from.
+                    self.on_run_imgtrans()
                 else:
                     self.on_run_imgtrans(pages_to_process=dialog.selected_pages())
             finally:
@@ -2559,25 +2577,36 @@ class MainWindow(mainwindow_cls):
     def _begin_extract_only_run(self) -> None:
         """Disable the stages a text-extraction run never runs."""
         self._end_extract_only_run()
-        self._extract_stage_backup = (
-            pcfg.module.enable_inpaint,
-            pcfg.module.enable_translate,
-            pcfg.module.enable_proofread,
-        )
+        self._extract_stage_backup = {
+            name: getattr(pcfg.module, name) for name in STAGE_FLAG_NAMES
+        }
         pcfg.module.enable_inpaint = False
         pcfg.module.enable_translate = False
         pcfg.module.enable_proofread = False
+
+    def _begin_proofread_only_run(self) -> None:
+        """Run only the proofreading stage, whatever its switch says.
+
+        The workflow exists for translations that were produced elsewhere: it
+        must not re-read the image, re-translate, or repaint anything.
+        """
+        self._end_extract_only_run()
+        self._extract_stage_backup = {
+            name: getattr(pcfg.module, name) for name in STAGE_FLAG_NAMES
+        }
+        pcfg.module.enable_detect = False
+        pcfg.module.enable_ocr = False
+        pcfg.module.enable_inpaint = False
+        pcfg.module.enable_translate = False
+        pcfg.module.enable_proofread = True
 
     def _end_extract_only_run(self) -> None:
         backup = self._extract_stage_backup
         if backup is None:
             return
         self._extract_stage_backup = None
-        (
-            pcfg.module.enable_inpaint,
-            pcfg.module.enable_translate,
-            pcfg.module.enable_proofread,
-        ) = backup
+        for name, value in backup.items():
+            setattr(pcfg.module, name, value)
 
     def on_run_imgtrans(
         self,

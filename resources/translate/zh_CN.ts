@@ -5939,6 +5939,26 @@ Then restart Photoshop. Explorer will now open the source file and destination l
         <source>Proofreading</source>
         <translation>校对</translation>
     </message>
+    <message>
+        <source>Start Proofreading</source>
+        <translation>开始校对</translation>
+    </message>
+    <message>
+        <source>Check the translations already stored in this project, including text imported from outside. Detection, OCR, translation, and inpainting are skipped, so the page images stay untouched.</source>
+        <translation>只检查项目中已有的译文，包括从外部导入的译文。不重新识别文字、不重新翻译、也不修改图片。</translation>
+    </message>
+    <message>
+        <source>%d pages to proofread (%d translated blocks)</source>
+        <translation>待校对 %d 页（%d 个已翻译文本块）</translation>
+    </message>
+    <message>
+        <source>This project has no translated text yet. Import or translate it first.</source>
+        <translation>当前项目还没有译文，请先导入或翻译。</translation>
+    </message>
+    <message>
+        <source>Keep the model loaded after the run</source>
+        <translation>运行后保持模型常驻</translation>
+    </message>
 </context>
 <context>
     <name>SecretLineEditor</name>

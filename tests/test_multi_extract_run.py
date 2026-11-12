@@ -113,15 +113,22 @@ class MultiExtractDialogTest(unittest.TestCase):
         dialog.deleteLater()
         get_app().processEvents()
 
-    def test_workflow_list_ends_with_multi_pass_extraction(self):
+    def test_workflow_list_matches_the_persisted_modes(self):
         dialog = self._dialog()
         selector = dialog.workflow_selector
 
         self.assertEqual(
             [selector.itemText(i) for i in range(selector.count())],
-            ['Pipeline', 'Rendering', 'Text Extraction', 'Multi-Pass Extraction'],
+            [
+                'Pipeline',
+                'Rendering',
+                'Text Extraction',
+                'Multi-Pass Extraction',
+                'Proofreading',
+            ],
         )
         self.assertEqual(RunPipelineDialog.WORKFLOW_MODES[3], 'multi_extraction')
+        self.assertEqual(RunPipelineDialog.WORKFLOW_MODES[4], 'proofread')
 
     def test_selecting_the_workflow_switches_page_and_buttons(self):
         dialog = self._dialog()
