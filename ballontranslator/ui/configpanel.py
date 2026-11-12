@@ -969,14 +969,27 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         proofread_prompt_layout.setContentsMargins(0, 0, 0, 0)
         proofread_prompt_layout.setSpacing(8)
         proofread_prompt_layout.addWidget(self.proofread_prompt_edit)
+        # Hug the label instead of stretching across the whole editor width.
+        proofread_reset_row = Widget()
+        proofread_reset_row.setObjectName('ConfigInlineRow')
+        proofread_reset_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        proofread_reset_layout = QHBoxLayout(proofread_reset_row)
+        proofread_reset_layout.setContentsMargins(0, 0, 0, 0)
+        proofread_reset_layout.setSpacing(0)
+        proofread_reset_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.proofread_reset_prompt_btn = QPushButton(
-            self.tr('Restore Default Prompt'), self
+            self.tr('Restore Default Prompt'), proofread_reset_row
         )
         self.proofread_reset_prompt_btn.setFixedHeight(PUSHBTN_FIXED_HEIGHT)
+        self.proofread_reset_prompt_btn.setSizePolicy(
+            QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+        )
         self.proofread_reset_prompt_btn.clicked.connect(self.on_reset_proofread_prompt)
-        proofread_prompt_layout.addWidget(self.proofread_reset_prompt_btn)
+        proofread_reset_layout.addWidget(self.proofread_reset_prompt_btn)
+        proofread_reset_layout.addStretch()
+        proofread_prompt_layout.addWidget(proofread_reset_row)
         proofread_prompt_layout.insertStretch(-1)
-        proofreadConfigPanel.addBlockWidget(
+        proofread_prompt_block = proofreadConfigPanel.addBlockWidget(
             proofread_prompt_layout,
             self.tr('Prompt'),
             self.tr(
@@ -1010,19 +1023,21 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         proofread_path_layout.addWidget(self.proofread_model_path_edit)
         proofread_path_layout.addWidget(self.proofread_browse_btn)
         proofread_path_layout.addStretch()
-        proofreadConfigPanel.addBlockWidget(
+        proofread_path_block = proofreadConfigPanel.addBlockWidget(
             proofread_path_row,
             self.tr('Model Folder'),
             self.tr(
                 'An existing ChineseErrorCorrector4-4B folder. Leave empty to '
                 'reuse a local copy, or download it from the Tools menu.'
             ),
+            vertical_layout=True,
         )
 
-        self.proofread_device_combo, _ = proofreadConfigPanel.addCombobox(
+        self.proofread_device_combo, proofread_device_block = proofreadConfigPanel.addCombobox(
             [self.tr('Auto'), 'CUDA', 'CPU'],
             self.tr('Device'),
             self.tr('Auto uses the GPU when this build has one.'),
+            vertical_layout=True,
         )
         self.proofread_device_combo.currentIndexChanged.connect(
             self.on_proofread_device_changed
@@ -1093,6 +1108,24 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         self.proofread_keep_loaded_checker.toggled.connect(
             self.on_proofread_keep_loaded_changed
         )
+        # Long descriptions wrap at the editor width instead of widening the
+        # section or being clipped at the right edge.
+        for block in (
+            proofread_prompt_block,
+            proofread_path_block,
+            proofread_device_block,
+        ):
+            label = block.description_label
+            if label is not None:
+                label.setWordWrap(True)
+                # A fixed width is what makes the wrapped height predictable.
+                # The section layout sizes rows by their minimum size, which
+                # ignores heightForWidth, so the wrapped height is set here.
+                label.setFixedWidth(LLM_PROMPT_EDITOR_WIDTH)
+                label.ensurePolished()
+                wrapped_height = label.heightForWidth(LLM_PROMPT_EDITOR_WIDTH)
+                if wrapped_height > 0:
+                    label.setMinimumHeight(wrapped_height)
         self.refreshProofreadSettings()
 
         update_status_widget = QWidget()
