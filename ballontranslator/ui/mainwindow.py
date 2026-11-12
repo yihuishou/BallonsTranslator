@@ -2730,6 +2730,11 @@ class MainWindow(mainwindow_cls):
         )
         # The menu action always writes plain translations. Font/size prefixes
         # remain available through the command-line entry's --font-info flag.
+        # The header note/labels come from the "Label TXT" settings page.
+        lptxt_note = getattr(pcfg, 'lptxt_note', None)
+        lptxt_labels = getattr(pcfg, 'lptxt_text_labels', None)
+        if not isinstance(lptxt_labels, (list, tuple)):
+            lptxt_labels = None
         fallback_page_size = None
         try:
             while True:
@@ -2739,6 +2744,8 @@ class MainWindow(mainwindow_cls):
                         project_data=project_data,
                         include_font_info=False,
                         fallback_page_size=fallback_page_size,
+                        note=lptxt_note,
+                        text_labels=lptxt_labels,
                     )
                 except LPTxtPageSizeError as e:
                     # One size is enough for every page whose real size is

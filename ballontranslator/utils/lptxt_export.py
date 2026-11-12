@@ -14,7 +14,10 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 LOGGER = logging.getLogger(__name__)
 
-LPTXT_HEADER = "1,0\n-\n框内\n框外\n-\n备注备注备注\n"
+# Defaults reproduce the historical hard-coded header, so callers that do not
+# pass a custom note / labels (e.g. the CLI) keep byte-identical output.
+DEFAULT_LPTXT_NOTE = "备注"
+DEFAULT_LPTXT_TEXT_LABELS: Tuple[str, ...] = ("框内", "框外")
 IMAGE_EXTENSIONS = (".png", ".jpg", ".jpeg", ".bmp", ".webp")
 # LabelPlus coordinates are normalized to 0..1 and rounded to 3 decimals.
 COORD_DECIMALS = 3
@@ -28,6 +31,40 @@ class LPTxtPageSizeError(ValueError):
     def __init__(self, page_name: str):
         super().__init__(f"无法确定页面 {page_name!r} 的图片尺寸，请提供 fallback_page_size")
         self.page_name = page_name
+
+
+def _single_line(value: Any) -> str:
+    """Collapse whitespace so a value can never break the fixed header lines."""
+    if not isinstance(value, str):
+        return ""
+    return " ".join(value.split())
+
+
+def build_lptxt_header(
+    note: Optional[str] = None,
+    text_labels: Optional[Sequence[str]] = None,
+) -> str:
+    """Build the LabelPlus group/label header from configurable values.
+
+    The header has a fixed line layout (``1,0`` / ``-`` / labels / ``-`` /
+    note), so multi-line user input is folded into a single line and empty
+    labels are dropped. ``None`` arguments fall back to the historical
+    defaults.
+    """
+    if note is None:
+        note = DEFAULT_LPTXT_NOTE
+    if text_labels is None:
+        text_labels = DEFAULT_LPTXT_TEXT_LABELS
+    labels: List[str] = []
+    for label in text_labels:
+        cleaned = _single_line(label)
+        if cleaned:
+            labels.append(cleaned)
+    header_lines = ["1,0", "-", *labels, "-", _single_line(note)]
+    return "\n".join(header_lines) + "\n"
+
+
+LPTXT_HEADER = build_lptxt_header()
 
 
 def _font_prefix(item: Dict[str, Any]) -> str:
@@ -114,6 +151,8 @@ def export_lptxt(
     project_data: Optional[Dict[str, Any]] = None,
     include_font_info: bool = False,
     fallback_page_size: Optional[PageSize] = None,
+    note: Optional[str] = None,
+    text_labels: Optional[Sequence[str]] = None,
 ) -> str:
     """Write a LabelPlus txt and return its path.
 
@@ -129,6 +168,9 @@ def export_lptxt(
     normalized coordinates. If no size is available, ``LPTxtPageSizeError`` is
     raised with the page name, letting an interactive caller ask the user and
     retry with a fallback size.
+
+    ``note`` and ``text_labels`` customize the LabelPlus header; omitting them
+    keeps the historical ``LPTXT_HEADER`` unchanged.
     """
     if project_data is None:
         with open(json_path, "r", encoding="utf-8") as f:
@@ -150,7 +192,7 @@ def export_lptxt(
         LOGGER.warning("项目 JSON 缺少有效的 pages，导出内容不含页面")
         pages = {}
 
-    lines: List[str] = [LPTXT_HEADER]
+    lines: List[str] = [build_lptxt_header(note, text_labels)]
     for page_name, items in pages.items():
         width, height = _resolve_page_size(data, page_name, json_dir, fallback_page_size)
         lines.append(f">>>>>>>>[{page_name}]<<<<<<<<\n")

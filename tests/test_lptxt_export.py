@@ -4,7 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from ballontranslator.utils.lptxt_export import LPTxtPageSizeError, export_lptxt
+from ballontranslator.utils.lptxt_export import (
+    LPTXT_HEADER,
+    LPTxtPageSizeError,
+    build_lptxt_header,
+    export_lptxt,
+)
 
 
 def block_lines(text: str):
@@ -47,11 +52,38 @@ class LPTxtExportTest(unittest.TestCase):
 
     def test_header_and_normalized_coordinates(self):
         text = self._export()
-        self.assertTrue(text.startswith("1,0\n-\n框内\n框外\n-\n备注备注备注\n"))
+        self.assertTrue(text.startswith("1,0\n-\n框内\n框外\n-\n备注\n"))
         self.assertIn(">>>>>>>>[p1.png]<<<<<<<<\n", text)
         self.assertIn("----------------[1]----------------[0.1, 0.1, 1]\n", text)
         self.assertEqual(len(block_lines(text)), 5)
         self.assertIn("\n译文A\n", text)
+
+    def test_default_header_matches_historical_format(self):
+        self.assertEqual(LPTXT_HEADER, "1,0\n-\n框内\n框外\n-\n备注\n")
+        self.assertEqual(build_lptxt_header(), LPTXT_HEADER)
+
+    def test_custom_note_and_text_labels(self):
+        text = self._export(
+            note="嵌字备注", text_labels=["对白", "旁白", "注释"]
+        )
+        self.assertTrue(
+            text.startswith("1,0\n-\n对白\n旁白\n注释\n-\n嵌字备注\n")
+        )
+        self.assertNotIn("框内", text)
+        self.assertIn("\n译文A\n", text)
+
+    def test_multiline_values_are_folded_into_single_lines(self):
+        text = self._export(
+            note="第一行\n  第二行 ",
+            text_labels=["  对白  ", "旁白\n换行", "", None, 123, "注释"],
+        )
+        self.assertTrue(
+            text.startswith("1,0\n-\n对白\n旁白 换行\n注释\n-\n第一行 第二行\n")
+        )
+
+    def test_empty_labels_and_note_keep_header_line_layout(self):
+        text = self._export(note="", text_labels=[])
+        self.assertTrue(text.startswith("1,0\n-\n-\n\n>>>>>>>>[p1.png]<<<<<<<<\n"))
 
     def test_normalized_coordinates_keep_three_decimals(self):
         data = {

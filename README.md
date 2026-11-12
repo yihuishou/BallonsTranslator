@@ -234,7 +234,7 @@ Sugoi 翻译器作者: [mingshiba](https://www.patreon.com/mingshiba)
    * 详细说明见 [团子OCR说明](doc/团子OCR说明.md)
  * OCR设置项: 字体识别。把[字体识别模型（YuzuMarker.FontDetection）](https://github.com/JeffersonQin/YuzuMarker.FontDetection)下载下来放在data\models\YuzuMarker.FontDetection目录下。
   需要的三个文件分别是```data\models\YuzuMarker.FontDetection\font_dataset``` ，  ```data\models\YuzuMarker.FontDetection\name=4x-epoch=18-step=368676.ckpt```，  ```data\font_demo_cache.bin```  
-  识别到的置信率大于60%的字体名称会保存在json文件的```_detected_font_name```字段中。目前没做可视化外显，可通过「工具」菜单的「导出 Label TXT」导出纯译文的LabelPlus txt（不含字体字号），或使用[脚本](scripts/BTjson_to_LPtxt.py)命令行导出（加 `--font-info` 可附带字体字号信息），导入到其他软件（如PS/ID）嵌字用。
+  识别到的置信率大于60%的字体名称会保存在json文件的```_detected_font_name```字段中。目前没做可视化外显，可通过「工具」菜单的「导出 Label TXT」导出纯译文的LabelPlus txt（不含字体字号），或使用[脚本](scripts/BTjson_to_LPtxt.py)命令行导出（加 `--font-info` 可附带字体字号信息），导入到其他软件（如PS/ID）嵌字用。txt 头部的「备注」和「Photoshop 动作分组」可在「设置 → 常规 → Label TXT」中配置（分组支持增加/修改/删除；列表序号从 1 开始，仅用于显示、不写入导出文本）；命令行导出沿用脚本内默认值。
 
 ### 图像修复
   * AOT 修复模型来自 manga-image-translator

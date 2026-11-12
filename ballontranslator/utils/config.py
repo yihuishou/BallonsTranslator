@@ -460,6 +460,9 @@ class ProgramConfig(Config):
     spellcheck_repo_dicts: str = ""
     spellcheck_distance: int = 1
     spellcheck_on_source_enabled: bool = False
+    # LabelPlus txt export header; defaults mirror utils/lptxt_export.py.
+    lptxt_note: str = '备注'
+    lptxt_text_labels: List[str] = field(default_factory=lambda: ['框内', '框外'])
     show_textdetector_tool: bool = True
     show_ocr_tool: bool = True
     show_translator_tool: bool = True
@@ -564,6 +567,22 @@ class ProgramConfig(Config):
                         'Discard invalid or duplicate entries in excluded_fonts config.'
                     )
                 config_dict['excluded_fonts'] = normalized_fonts
+
+        if 'lptxt_text_labels' in config_dict:
+            labels = config_dict['lptxt_text_labels']
+            if not isinstance(labels, list):
+                LOGGER.warning(
+                    'Discard invalid lptxt_text_labels config: expected a list of strings.'
+                )
+                config_dict.pop('lptxt_text_labels')
+            else:
+                config_dict['lptxt_text_labels'] = [
+                    label for label in labels
+                    if isinstance(label, str) and label.strip()
+                ]
+        if 'lptxt_note' in config_dict and not isinstance(config_dict['lptxt_note'], str):
+            LOGGER.warning('Discard invalid lptxt_note config: expected a string.')
+            config_dict.pop('lptxt_note')
 
         if 'custom_colors' in config_dict:
             custom_colors = config_dict['custom_colors']

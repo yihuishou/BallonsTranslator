@@ -8,6 +8,7 @@ from qtpy.QtWidgets import (
     QSplitter, QScrollArea, QLineEdit, QStackedWidget, QMessageBox,
     QListWidget, QSpinBox, QProgressDialog, QFileDialog, QListWidgetItem,
     QDialog, QAbstractItemView, QButtonGroup, QRadioButton,
+    QPlainTextEdit, QInputDialog,
     QFrame,
 )
 from qtpy.QtCore import Qt, Signal, QSize, QItemSelection, QTimer
@@ -33,6 +34,7 @@ from ballontranslator.utils.shared import (
     CONFIG_FONTSIZE_CONTENT,
     CONFIG_FONTSIZE_TABLE,
     LEGACY_FONTS,
+    LLM_PROMPT_EDITOR_WIDTH,
     ON_MACOS,
     ON_WINDOWS,
     PROGRAM_PATH,
@@ -736,6 +738,7 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         label_application = self.tr('Application')
         label_typesetting = self.tr('Typesetting')
         label_spellcheck = self.tr('Spell Checker')
+        label_lptxt = self.tr('Label TXT')
 
         pipelineConfigPanel = self.addConfigBlock(label_pipeline, moduleTableItem, 'pipeline')
         llmProfileConfigPanel = self.addConfigBlock(label_llm_profile, moduleTableItem, 'llm_profile')
@@ -743,6 +746,7 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         applicationConfigPanel = self.addConfigBlock(label_application, generalTableItem, 'application')
         typesettingConfigPanel = self.addConfigBlock(label_typesetting, generalTableItem, 'typesetting')
         spellcheckConfigPanel = self.addConfigBlock(label_spellcheck, generalTableItem, 'spellcheck')
+        lptxtConfigPanel = self.addConfigBlock(label_lptxt, generalTableItem, 'lptxt')
         
         pipeline_options = QWidget()
         pipeline_options.setObjectName('PipelineModuleOptions')
@@ -954,6 +958,72 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         ext_layout.addLayout(ext_btns_layout)
 
         self.spellcheck_subblock = spellcheckConfigPanel.addBlockWidget(ext_layout)
+
+        # Label TXT export header (Tools -> 导出 Label TXT). The two values
+        # below replace the hard-coded note and label lines in LPTXT_HEADER.
+        # Mirror the Codex translation-prompt editor: a QPlainTextEdit picks up
+        # the ConfigContentScrollContent QSS (underline border, rounded corners,
+        # 13px font) and gets the same overlay scrollbars and width.
+        self.lptxt_note_edit = QPlainTextEdit(self)
+        self.lptxt_note_edit.setObjectName('LabelTxtNoteEdit')
+        self.lptxt_note_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self.lptxt_note_edit.setFixedWidth(LLM_PROMPT_EDITOR_WIDTH)
+        self.lptxt_note_edit.setFixedHeight(140)
+        self.lptxt_note_edit.setToolTip('导出时多行内容会合并为一行，以免破坏 LabelPlus 头部格式')
+        self.lptxt_note_edit.scrollbar_v = ScrollBar(
+            Qt.Orientation.Vertical, self.lptxt_note_edit, fadeout=False, hover_style=True
+        )
+        self.lptxt_note_edit.scrollbar_h = ScrollBar(
+            Qt.Orientation.Horizontal, self.lptxt_note_edit, fadeout=False, hover_style=True
+        )
+        self.lptxt_note_edit.textChanged.connect(self.on_lptxt_note_changed)
+        self.lptxt_note_block = lptxtConfigPanel.addBlockWidget(
+            self.lptxt_note_edit, '备注',
+            '写在 LabelPlus txt 头部的备注；导出时多行会合并为一行。',
+            vertical_layout=True,
+        )
+
+        lptxt_text_layout = QVBoxLayout()
+        lptxt_text_layout.setContentsMargins(0, 0, 0, 0)
+        lptxt_text_layout.setSpacing(6)
+        self.lptxt_text_list = QListWidget(self)
+        self.lptxt_text_list.setObjectName('LabelTxtTextList')
+        self.lptxt_text_list.setFixedWidth(LLM_PROMPT_EDITOR_WIDTH)
+        self.lptxt_text_list.setFixedHeight(160)
+        self.lptxt_text_list.scrollbar_v = ScrollBar(
+            Qt.Orientation.Vertical, self.lptxt_text_list, hover_style=True
+        )
+        self.lptxt_text_list.itemDoubleClicked.connect(
+            lambda *_: self.on_lptxt_edit_text()
+        )
+        lptxt_text_layout.addWidget(self.lptxt_text_list)
+
+        lptxt_text_btns = QHBoxLayout()
+        lptxt_text_btns.setContentsMargins(0, 0, 0, 0)
+        lptxt_text_btns.setSpacing(8)
+        self.lptxt_add_text_btn = QPushButton('增加', self)
+        self.lptxt_edit_text_btn = QPushButton('修改', self)
+        self.lptxt_remove_text_btn = QPushButton('删除', self)
+        for btn in (
+            self.lptxt_add_text_btn,
+            self.lptxt_edit_text_btn,
+            self.lptxt_remove_text_btn,
+        ):
+            btn.setFixedHeight(PUSHBTN_FIXED_HEIGHT)
+            lptxt_text_btns.addWidget(btn)
+        lptxt_text_btns.addStretch()
+        self.lptxt_add_text_btn.clicked.connect(self.on_lptxt_add_text)
+        self.lptxt_edit_text_btn.clicked.connect(self.on_lptxt_edit_text)
+        self.lptxt_remove_text_btn.clicked.connect(self.on_lptxt_remove_text)
+        lptxt_text_layout.addLayout(lptxt_text_btns)
+        self.lptxt_group_block = lptxtConfigPanel.addBlockWidget(
+            lptxt_text_layout, 'Photoshop 动作分组',
+            'LabelPlus txt 头部的分组，可增加、修改、删除；双击列表项也可修改。\n'
+            '左侧序号从 1 开始，仅用于显示，不会写入导出文本。',
+            vertical_layout=True,
+        )
+        for sublock in (self.lptxt_note_block, self.lptxt_group_block):
+            self._lptxt_style_labels(sublock)
 
         none_label = self.tr('None')
         self.huggingface_mirror_combobox, _ = applicationConfigPanel.addCombobox(
@@ -1527,6 +1597,96 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         SpellCheckManager.get_instance().notify_config_changed()
         self.save_config.emit()
 
+    @staticmethod
+    def _lptxt_style_labels(sublock: ConfigSubBlock) -> None:
+        """Keep the title readable and render the hint as small wrapped text.
+
+        ConfigSubBlock gives the name and the description the same font size.
+        The Label TXT page uses the Codex prompt-editor look instead: a normal
+        title above a compact caption, with explicit newlines respected.
+        """
+        if sublock.name_label is not None:
+            font = sublock.name_label.font()
+            font.setPointSizeF(CONFIG_FONTSIZE_CONTENT - 2)
+            sublock.name_label.setFont(font)
+        if sublock.description_label is not None:
+            font = sublock.description_label.font()
+            font.setPointSizeF(CONFIG_FONTSIZE_CONTENT - 4)
+            sublock.description_label.setFont(font)
+            sublock.description_label.setWordWrap(True)
+
+    @staticmethod
+    def _lptxt_label_value(item) -> str:
+        """The real group name, without the display-only leading number."""
+        value = item.data(Qt.ItemDataRole.UserRole)
+        return value if isinstance(value, str) else ''
+
+    def _lptxt_append_label(self, label: str) -> None:
+        item = QListWidgetItem()
+        item.setData(Qt.ItemDataRole.UserRole, label)
+        self.lptxt_text_list.addItem(item)
+
+    def _lptxt_refresh_label_numbers(self) -> None:
+        """Show 1-based numbers in the list without ever storing them.
+
+        Only ``item.text()`` carries the number; the value used for config and
+        export lives in UserRole, so the number can never leak into the txt.
+        """
+        for row in range(self.lptxt_text_list.count()):
+            item = self.lptxt_text_list.item(row)
+            item.setText(f'{row + 1}.  {self._lptxt_label_value(item)}')
+
+    def _lptxt_sync_text_labels(self) -> None:
+        labels = []
+        for row in range(self.lptxt_text_list.count()):
+            label = self._lptxt_label_value(self.lptxt_text_list.item(row))
+            if label:
+                labels.append(label)
+        pcfg.lptxt_text_labels = labels
+        self.save_config.emit()
+
+    def on_lptxt_note_changed(self) -> None:
+        # Like the other free-text settings, keep this in memory only; the
+        # window's hideEvent emits save_config once instead of writing the
+        # whole config file on every keystroke.
+        pcfg.lptxt_note = self.lptxt_note_edit.toPlainText()
+
+    def on_lptxt_add_text(self) -> None:
+        text, ok = QInputDialog.getText(self, '增加分组', '分组名称：')
+        if not ok:
+            return
+        text = text.strip()
+        if not text:
+            return
+        self._lptxt_append_label(text)
+        self._lptxt_refresh_label_numbers()
+        self.lptxt_text_list.setCurrentRow(self.lptxt_text_list.count() - 1)
+        self._lptxt_sync_text_labels()
+
+    def on_lptxt_edit_text(self) -> None:
+        item = self.lptxt_text_list.currentItem()
+        if item is None:
+            return
+        text, ok = QInputDialog.getText(
+            self, '修改分组', '分组名称：', text=self._lptxt_label_value(item)
+        )
+        if not ok:
+            return
+        text = text.strip()
+        if not text:
+            return
+        item.setData(Qt.ItemDataRole.UserRole, text)
+        self._lptxt_refresh_label_numbers()
+        self._lptxt_sync_text_labels()
+
+    def on_lptxt_remove_text(self) -> None:
+        row = self.lptxt_text_list.currentRow()
+        if row < 0:
+            return
+        self.lptxt_text_list.takeItem(row)
+        self._lptxt_refresh_label_numbers()
+        self._lptxt_sync_text_labels()
+
     def open_words_manager(self) -> None:
         dialog = DictionaryManagerDialog(self)
         try:
@@ -1820,6 +1980,22 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
 
     def setupConfig(self):
         self.blockSignals(True)
+
+        # Label TXT export header
+        self.lptxt_note_edit.blockSignals(True)
+        note = getattr(pcfg, 'lptxt_note', '')
+        self.lptxt_note_edit.setPlainText(note if isinstance(note, str) else '')
+        self.lptxt_note_edit.blockSignals(False)
+        labels = getattr(pcfg, 'lptxt_text_labels', None)
+        if not isinstance(labels, (list, tuple)):
+            labels = []
+        self.lptxt_text_list.blockSignals(True)
+        self.lptxt_text_list.clear()
+        for label in labels:
+            if isinstance(label, str) and label.strip():
+                self._lptxt_append_label(label)
+        self._lptxt_refresh_label_numbers()
+        self.lptxt_text_list.blockSignals(False)
 
         if pcfg.open_recent_on_startup:
             self.open_on_startup_checker.setChecked(True)
