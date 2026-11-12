@@ -2,7 +2,7 @@
 
 ## Project Shape
 
-BallonsTranslator is a PyQt/qtpy desktop app for comic image translation.
+BallonsTranslator is a PyQt/qtpy desktop app for comic image translation. Project structure, module ownership, and run/verify entry points are mapped in [Agent.md](Agent.md); this file holds the rules that constrain changes.
 
 - `ballontranslator/launch.py`: startup, dependencies, Qt setup, and headless mode.
 - `ballontranslator/ui/`: canvas, panels, module manager, and workers.
