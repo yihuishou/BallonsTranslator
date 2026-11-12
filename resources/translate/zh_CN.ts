@@ -185,77 +185,77 @@
 <context>
     <name>Canvas</name>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1708"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1735"/>
         <source>Copy</source>
         <translation>复制</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1710"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1737"/>
         <source>Paste</source>
         <translation>粘贴</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1712"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1739"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1714"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1741"/>
         <source>Copy source text</source>
         <translation>复制原文</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1716"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1743"/>
         <source>Paste source text</source>
         <translation>粘贴原文</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1718"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1745"/>
         <source>Delete and Recover removed text</source>
         <translation>删除并恢复被抹除文字</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1723"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1750"/>
         <source>Apply font formatting</source>
         <translation>应用字体格式</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1724"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1751"/>
         <source>Auto layout</source>
         <translation>自动排版</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1725"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1752"/>
         <source>Reset Angle</source>
         <translation>角度复位</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1726"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1753"/>
         <source>Squeeze</source>
         <translation>收缩</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1728"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1755"/>
         <source>translate</source>
         <translation>翻译</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1729"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1756"/>
         <source>OCR</source>
         <translation>OCR</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1730"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1757"/>
         <source>OCR and translate</source>
         <translation>OCR并翻译</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1731"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1758"/>
         <source>OCR, translate and inpaint</source>
         <translation>OCR，翻译并抹字</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/canvas.py" line="1732"/>
+        <location filename="../../ballontranslator/ui/canvas.py" line="1759"/>
         <source>inpaint</source>
         <translation>抹字</translation>
     </message>
@@ -4452,74 +4452,78 @@ All existing translation results will be cleared!</source>
 <context>
     <name>MultiExtractReviewDialog</name>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="74"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="162"/>
         <source>Review Multi-Pass Extraction</source>
         <translation>多重文本提取复核</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="83"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="171"/>
         <source>All</source>
         <translation>全部</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="84"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="172"/>
         <source>Text conflicts</source>
         <translation>文本冲突</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="85"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="173"/>
         <source>Single-pass regions</source>
         <translation>单路检出区域</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="112"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="200"/>
         <source>Readings</source>
         <translation>识别结果</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="130"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="218"/>
         <source>Apply to source text</source>
         <translation>覆盖为原文</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="132"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="220"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="185"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="273"/>
         <source>single pass</source>
         <translation>单路检出</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="185"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="273"/>
         <source>differs</source>
         <translation>结果不一致</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="192"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="280"/>
         <source>{shown} shown · {pending} pending</source>
         <translation>显示 {shown} 项 · 待复核 {pending} 项</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="209"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="297"/>
         <source>Nothing left to review.</source>
         <translation>没有待复核的内容。</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="237"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="336"/>
         <source>Pass {pass}</source>
         <translation>第 {pass} 路</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="247"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="355"/>
         <source>Only one pass detected this region. Nothing to choose; the text is kept as detected.</source>
         <translation>该区域只有一路检出，没有可选结果，文本按检出内容保留。</translation>
     </message>
     <message>
-        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="254"/>
+        <location filename="../../ballontranslator/ui/multi_extract_review_dialog.py" line="363"/>
+        <source>Applying overwrites the source text of this block. Red outlines mark the characters that differ between passes.</source>
+        <translation>覆盖后会改写此块的原文。红色描边标出各路结果中不同的字。</translation>
+    </message>
+    <message>
         <source>Applying overwrites the source text of this block.</source>
-        <translation>应用后会覆盖该文本框的原文。</translation>
+        <translation type="vanished">应用后会覆盖该文本框的原文。</translation>
     </message>
 </context>
 <context>
