@@ -33,6 +33,8 @@ class ProofreadThread(ThreadBase):
             model_dir=pcfg.text_correction_model_path,
             device=pcfg.text_correction_device,
             batch_size=pcfg.text_correction_batch_size,
+            prompt=pcfg.text_correction_prompt,
+            max_new_tokens=pcfg.text_correction_max_new_tokens,
             # A manual page check is one-off, so it hands the VRAM back.
             release_after=True,
         )

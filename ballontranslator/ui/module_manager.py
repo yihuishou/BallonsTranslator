@@ -190,6 +190,8 @@ def proofread_page_translations(project: ProjImgTrans, page_key: str) -> bool:
                 model_dir=pcfg.text_correction_model_path,
                 device=pcfg.text_correction_device,
                 batch_size=pcfg.text_correction_batch_size,
+                prompt=pcfg.text_correction_prompt,
+                max_new_tokens=pcfg.text_correction_max_new_tokens,
                 release_after=not pcfg.text_correction_keep_loaded,
             )
         except Exception as e:

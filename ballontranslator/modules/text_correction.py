@@ -87,6 +87,12 @@ def strip_reasoning(text: str) -> str:
     return cleaned.strip()
 
 
+def default_prompt() -> str:
+    """Return the instruction the model was fine-tuned with."""
+
+    return PROMPT_V4
+
+
 def looks_correctable(text: str) -> bool:
     """Skip blocks that carry no Chinese sentence to proofread.
 
@@ -208,11 +214,13 @@ class ChineseTextCorrector:
         device: str = '',
         batch_size: int = 8,
         max_new_tokens: int = 1024,
+        prompt: str = '',
     ) -> None:
         self.model_dir = model_dir
         self.device = device
         self.batch_size = max(1, int(batch_size))
         self.max_new_tokens = max(64, int(max_new_tokens))
+        self.prompt = (prompt or '').strip() or PROMPT_V4
         self._tokenizer = None
         self._model = None
 
@@ -274,13 +282,18 @@ class ChineseTextCorrector:
         except Exception:
             pass
 
+    def _build_prompt(self, sentence: str) -> str:
+        """Compose the user message: instruction first, sentence on its own line."""
+
+        return f'{self.prompt}\n{sentence}'
+
     def _generate(self, sentences: Sequence[str]) -> List[str]:
         import torch
 
         tokenizer = self._tokenizer
         prompts = [
             tokenizer.apply_chat_template(
-                [{'role': 'user', 'content': f'{PROMPT_V4}\n{sentence}'}],
+                [{'role': 'user', 'content': self._build_prompt(sentence)}],
                 tokenize=False,
                 add_generation_prompt=True,
             )
@@ -327,15 +340,21 @@ def get_corrector(
     model_dir: str = '',
     device: str = '',
     batch_size: int = 8,
+    prompt: str = '',
+    max_new_tokens: int = 1024,
 ) -> ChineseTextCorrector:
     """Return the process-wide corrector, rebuilding it when settings change."""
 
     global _CORRECTOR
+    prompt = (prompt or '').strip() or PROMPT_V4
+    max_new_tokens = max(64, int(max_new_tokens))
     if (
         _CORRECTOR is None
         or _CORRECTOR.model_dir != model_dir
         or _CORRECTOR.device != device
         or _CORRECTOR.batch_size != max(1, int(batch_size))
+        or _CORRECTOR.prompt != prompt
+        or _CORRECTOR.max_new_tokens != max_new_tokens
     ):
         if _CORRECTOR is not None:
             _CORRECTOR.release()
@@ -343,6 +362,8 @@ def get_corrector(
             model_dir=model_dir,
             device=device,
             batch_size=batch_size,
+            max_new_tokens=max_new_tokens,
+            prompt=prompt,
         )
     return _CORRECTOR
 
@@ -360,6 +381,8 @@ def proofread_translations(
     model_dir: str = '',
     device: str = '',
     batch_size: int = 8,
+    prompt: str = '',
+    max_new_tokens: int = 1024,
     release_after: bool = False,
 ) -> List[str]:
     """Proofread translated blocks and return one result per input.
@@ -381,6 +404,8 @@ def proofread_translations(
         model_dir=resolved_dir,
         device=device,
         batch_size=batch_size,
+        prompt=prompt,
+        max_new_tokens=max_new_tokens,
     )
     try:
         corrected = corrector.correct([results[index] for index in targets])

@@ -839,6 +839,9 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         pipelineConfigPanel = self.addConfigBlock(label_pipeline, moduleTableItem, 'pipeline')
         llmProfileConfigPanel = self.addConfigBlock(label_llm_profile, moduleTableItem, 'llm_profile')
         codexConfigPanel = self.addConfigBlock(self.tr('Codex'), moduleTableItem, 'codex')
+        proofreadConfigPanel = self.addConfigBlock(
+            self.tr('Proofreading'), moduleTableItem, 'proofread'
+        )
         applicationConfigPanel = self.addConfigBlock(label_application, generalTableItem, 'application')
         typesettingConfigPanel = self.addConfigBlock(label_typesetting, generalTableItem, 'typesetting')
         spellcheckConfigPanel = self.addConfigBlock(label_spellcheck, generalTableItem, 'spellcheck')
@@ -938,6 +941,159 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
         llmProfileConfigPanel.addBlockWidget(self.llm_profiles_panel)
         self.codex_panel = CodexSettingsPanel(scrollWidget=self)
         codexConfigPanel.addBlockWidget(self.codex_panel)
+
+        # Chinese proofreading model (ChineseErrorCorrector4-4B). Shared by the
+        # pipeline stage and the manual "Proofread Current Page" action.
+        from ballontranslator.modules.text_correction import (
+            default_model_dir as proofread_default_model_dir,
+            default_prompt as proofread_default_prompt,
+        )
+
+        self.proofread_prompt_edit = QPlainTextEdit(self)
+        self.proofread_prompt_edit.setObjectName('ProofreadPromptEdit')
+        self.proofread_prompt_edit.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        self.proofread_prompt_edit.setFixedWidth(LLM_PROMPT_EDITOR_WIDTH)
+        self.proofread_prompt_edit.setFixedHeight(170)
+        self.proofread_prompt_edit.setPlainText(
+            pcfg.text_correction_prompt or proofread_default_prompt()
+        )
+        self.proofread_prompt_edit.scrollbar_v = ScrollBar(
+            Qt.Orientation.Vertical, self.proofread_prompt_edit, fadeout=False, hover_style=True
+        )
+        self.proofread_prompt_edit.scrollbar_h = ScrollBar(
+            Qt.Orientation.Horizontal, self.proofread_prompt_edit, fadeout=False, hover_style=True
+        )
+        self.proofread_prompt_edit.textChanged.connect(self.on_proofread_prompt_changed)
+
+        proofread_prompt_layout = QVBoxLayout()
+        proofread_prompt_layout.setContentsMargins(0, 0, 0, 0)
+        proofread_prompt_layout.setSpacing(8)
+        proofread_prompt_layout.addWidget(self.proofread_prompt_edit)
+        self.proofread_reset_prompt_btn = QPushButton(
+            self.tr('Restore Default Prompt'), self
+        )
+        self.proofread_reset_prompt_btn.setFixedHeight(PUSHBTN_FIXED_HEIGHT)
+        self.proofread_reset_prompt_btn.clicked.connect(self.on_reset_proofread_prompt)
+        proofread_prompt_layout.addWidget(self.proofread_reset_prompt_btn)
+        proofread_prompt_layout.insertStretch(-1)
+        proofreadConfigPanel.addBlockWidget(
+            proofread_prompt_layout,
+            self.tr('Prompt'),
+            self.tr(
+                'Instruction given to the checker; the sentence to proofread is '
+                'appended on its own line.'
+            ),
+            vertical_layout=True,
+        )
+
+        proofread_path_row = Widget()
+        proofread_path_row.setObjectName('ConfigInlineRow')
+        proofread_path_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        proofread_path_layout = QHBoxLayout(proofread_path_row)
+        proofread_path_layout.setContentsMargins(0, 0, 0, 0)
+        proofread_path_layout.setSpacing(8)
+        proofread_path_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.proofread_model_path_edit = QLineEdit(proofread_path_row)
+        self.proofread_model_path_edit.setObjectName('ProofreadModelPathEdit')
+        self.proofread_model_path_edit.setFixedWidth(CONFIG_COMBOBOX_LONG)
+        self.proofread_model_path_edit.setFixedHeight(30)
+        self.proofread_model_path_edit.setText(pcfg.text_correction_model_path)
+        self.proofread_model_path_edit.setPlaceholderText(
+            self.tr('Default: ') + proofread_default_model_dir()
+        )
+        self.proofread_model_path_edit.editingFinished.connect(
+            self.on_proofread_model_path_changed
+        )
+        self.proofread_browse_btn = QPushButton(self.tr('Browse...'), proofread_path_row)
+        self.proofread_browse_btn.setFixedHeight(PUSHBTN_FIXED_HEIGHT)
+        self.proofread_browse_btn.clicked.connect(self.on_browse_proofread_model)
+        proofread_path_layout.addWidget(self.proofread_model_path_edit)
+        proofread_path_layout.addWidget(self.proofread_browse_btn)
+        proofread_path_layout.addStretch()
+        proofreadConfigPanel.addBlockWidget(
+            proofread_path_row,
+            self.tr('Model Folder'),
+            self.tr(
+                'An existing ChineseErrorCorrector4-4B folder. Leave empty to '
+                'reuse a local copy, or download it from the Tools menu.'
+            ),
+        )
+
+        self.proofread_device_combo, _ = proofreadConfigPanel.addCombobox(
+            [self.tr('Auto'), 'CUDA', 'CPU'],
+            self.tr('Device'),
+            self.tr('Auto uses the GPU when this build has one.'),
+        )
+        self.proofread_device_combo.currentIndexChanged.connect(
+            self.on_proofread_device_changed
+        )
+
+        proofread_batch_row = Widget()
+        proofread_batch_row.setObjectName('ConfigInlineRow')
+        proofread_batch_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        proofread_batch_layout = QHBoxLayout(proofread_batch_row)
+        proofread_batch_layout.setContentsMargins(0, 0, 0, 0)
+        proofread_batch_layout.setSpacing(12)
+        proofread_batch_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        proofread_batch_label = ConfigTextLabel(
+            self.tr('Batch Size'), CONFIG_FONTSIZE_CONTENT, QFont.Weight.Normal
+        )
+        proofread_batch_tooltip = self.tr(
+            'Sentences encoded at once. Larger batches are faster but need more VRAM.'
+        )
+        proofread_batch_label.setToolTip(proofread_batch_tooltip)
+        self.proofread_batch_spin = QSpinBox(proofread_batch_row)
+        self.proofread_batch_spin.setObjectName('ProofreadBatchSizeSpin')
+        self.proofread_batch_spin.setRange(1, 64)
+        self.proofread_batch_spin.setFixedWidth(CONFIG_COMBOBOX_SHORT)
+        self.proofread_batch_spin.setToolTip(proofread_batch_tooltip)
+        self.proofread_batch_spin.valueChanged.connect(
+            self.on_proofread_batch_size_changed
+        )
+        proofread_batch_layout.addWidget(proofread_batch_label)
+        proofread_batch_layout.addWidget(self.proofread_batch_spin)
+        proofread_batch_layout.addStretch()
+        proofreadConfigPanel.addBlockWidget(proofread_batch_row)
+
+        proofread_tokens_row = Widget()
+        proofread_tokens_row.setObjectName('ConfigInlineRow')
+        proofread_tokens_row.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        proofread_tokens_layout = QHBoxLayout(proofread_tokens_row)
+        proofread_tokens_layout.setContentsMargins(0, 0, 0, 0)
+        proofread_tokens_layout.setSpacing(12)
+        proofread_tokens_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        proofread_tokens_label = ConfigTextLabel(
+            self.tr('Max New Tokens'), CONFIG_FONTSIZE_CONTENT, QFont.Weight.Normal
+        )
+        proofread_tokens_tooltip = self.tr(
+            'Upper bound of the answer length, including the reasoning block.'
+        )
+        proofread_tokens_label.setToolTip(proofread_tokens_tooltip)
+        self.proofread_tokens_spin = QSpinBox(proofread_tokens_row)
+        self.proofread_tokens_spin.setObjectName('ProofreadMaxTokensSpin')
+        self.proofread_tokens_spin.setRange(64, 4096)
+        self.proofread_tokens_spin.setSingleStep(64)
+        self.proofread_tokens_spin.setFixedWidth(CONFIG_COMBOBOX_SHORT)
+        self.proofread_tokens_spin.setToolTip(proofread_tokens_tooltip)
+        self.proofread_tokens_spin.valueChanged.connect(
+            self.on_proofread_max_tokens_changed
+        )
+        proofread_tokens_layout.addWidget(proofread_tokens_label)
+        proofread_tokens_layout.addWidget(self.proofread_tokens_spin)
+        proofread_tokens_layout.addStretch()
+        proofreadConfigPanel.addBlockWidget(proofread_tokens_row)
+
+        self.proofread_keep_loaded_checker, _ = proofreadConfigPanel.addCheckBox(
+            self.tr('Keep the model loaded'),
+            discription=self.tr(
+                'Holds about 7.5 GB of VRAM between pages. Disable to free it '
+                'after every page, at the cost of reloading the model.'
+            ),
+        )
+        self.proofread_keep_loaded_checker.toggled.connect(
+            self.on_proofread_keep_loaded_changed
+        )
+        self.refreshProofreadSettings()
 
         update_status_widget = QWidget()
         update_status_widget.setObjectName('ConfigInlineRow')
@@ -1626,6 +1782,7 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
 
     def showConfigDialog(self, section_key: str = None):
         self.refreshTorchStatus()
+        self.refreshProofreadSettings()
         if section_key is not None:
             self.showSection(section_key)
         elif self.configContent.currentIndex() < 0:
@@ -1652,6 +1809,71 @@ class ConfigPanel(OutsideClickFramelessMixin, FramelessWindow):
 
     def on_check_update_onstartup_changed(self):
         pcfg.check_update_on_startup = self.check_update_on_startup_checker.isChecked()
+
+    def refreshProofreadSettings(self) -> None:
+        """Mirror the model settings, which the Tools menu can also change."""
+
+        from ballontranslator.modules.text_correction import default_prompt
+
+        self.proofread_model_path_edit.setText(pcfg.text_correction_model_path)
+        device = (pcfg.text_correction_device or '').lower()
+        self.proofread_device_combo.setCurrentIndex({'cuda': 1, 'cpu': 2}.get(device, 0))
+        self.proofread_batch_spin.setValue(max(1, int(pcfg.text_correction_batch_size)))
+        self.proofread_tokens_spin.setValue(
+            max(64, int(pcfg.text_correction_max_new_tokens))
+        )
+        self.proofread_keep_loaded_checker.setChecked(
+            bool(pcfg.text_correction_keep_loaded)
+        )
+        prompt = pcfg.text_correction_prompt or default_prompt()
+        if (
+            not self.proofread_prompt_edit.hasFocus()
+            and prompt != self.proofread_prompt_edit.toPlainText()
+        ):
+            # Blocked so a refresh never rewrites the stored prompt.
+            self.proofread_prompt_edit.blockSignals(True)
+            self.proofread_prompt_edit.setPlainText(prompt)
+            self.proofread_prompt_edit.blockSignals(False)
+
+    def on_proofread_prompt_changed(self) -> None:
+        from ballontranslator.modules.text_correction import default_prompt
+
+        text = self.proofread_prompt_edit.toPlainText().strip()
+        # The shipped instruction is the fallback, so matching it stores '' and
+        # keeps the long default out of the config file.
+        pcfg.text_correction_prompt = '' if text == default_prompt().strip() else text
+
+    def on_reset_proofread_prompt(self) -> None:
+        from ballontranslator.modules.text_correction import default_prompt
+
+        self.proofread_prompt_edit.setPlainText(default_prompt())
+
+    def on_proofread_model_path_changed(self) -> None:
+        pcfg.text_correction_model_path = self.proofread_model_path_edit.text().strip()
+
+    def on_browse_proofread_model(self) -> None:
+        from ballontranslator.modules.text_correction import default_model_dir
+
+        start = pcfg.text_correction_model_path or default_model_dir()
+        path = QFileDialog.getExistingDirectory(
+            self, self.tr('Select the proofreading model folder'), start
+        )
+        if not path:
+            return
+        self.proofread_model_path_edit.setText(path)
+        self.on_proofread_model_path_changed()
+
+    def on_proofread_device_changed(self, index: int) -> None:
+        pcfg.text_correction_device = {1: 'cuda', 2: 'cpu'}.get(index, '')
+
+    def on_proofread_batch_size_changed(self, value: int) -> None:
+        pcfg.text_correction_batch_size = int(value)
+
+    def on_proofread_max_tokens_changed(self, value: int) -> None:
+        pcfg.text_correction_max_new_tokens = int(value)
+
+    def on_proofread_keep_loaded_changed(self, checked: bool) -> None:
+        pcfg.text_correction_keep_loaded = bool(checked)
 
     def on_spellcheck_changed(self):
         enabled = self.spellcheck_checker.isChecked()

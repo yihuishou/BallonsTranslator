@@ -1110,6 +1110,78 @@
         <source>Codex</source>
         <translation>Codex</translation>
     </message>
+    <message>
+        <source>Proofreading</source>
+        <translation>中文校对</translation>
+    </message>
+    <message>
+        <source>Prompt</source>
+        <translation>提示词</translation>
+    </message>
+    <message>
+        <source>Instruction given to the checker; the sentence to proofread is appended on its own line.</source>
+        <translation>给校对模型的指令；待校对的句子会自动接在下一行。</translation>
+    </message>
+    <message>
+        <source>Restore Default Prompt</source>
+        <translation>恢复默认提示词</translation>
+    </message>
+    <message>
+        <source>Model Folder</source>
+        <translation>模型目录</translation>
+    </message>
+    <message>
+        <source>An existing ChineseErrorCorrector4-4B folder. Leave empty to reuse a local copy, or download it from the Tools menu.</source>
+        <translation>已下载的 ChineseErrorCorrector4-4B 目录。留空则复用本地已有副本，也可从「工具」菜单下载。</translation>
+    </message>
+    <message>
+        <source>Default: </source>
+        <translation>默认：</translation>
+    </message>
+    <message>
+        <source>Browse...</source>
+        <translation>浏览...</translation>
+    </message>
+    <message>
+        <source>Select the proofreading model folder</source>
+        <translation>选择校对模型目录</translation>
+    </message>
+    <message>
+        <source>Device</source>
+        <translation>运行设备</translation>
+    </message>
+    <message>
+        <source>Auto</source>
+        <translation>自动</translation>
+    </message>
+    <message>
+        <source>Auto uses the GPU when this build has one.</source>
+        <translation>自动：本构建有可用 GPU 时使用 GPU。</translation>
+    </message>
+    <message>
+        <source>Batch Size</source>
+        <translation>批量大小</translation>
+    </message>
+    <message>
+        <source>Sentences encoded at once. Larger batches are faster but need more VRAM.</source>
+        <translation>一次编码的句子数。批量越大越快，但占用显存更多。</translation>
+    </message>
+    <message>
+        <source>Max New Tokens</source>
+        <translation>最大生成长度</translation>
+    </message>
+    <message>
+        <source>Upper bound of the answer length, including the reasoning block.</source>
+        <translation>输出长度上限，包含思考块。</translation>
+    </message>
+    <message>
+        <source>Keep the model loaded</source>
+        <translation>常驻显存</translation>
+    </message>
+    <message>
+        <source>Holds about 7.5 GB of VRAM between pages. Disable to free it after every page, at the cost of reloading the model.</source>
+        <translation>页面之间保持约 7.5 GB 显存占用。关闭后每页用完即释放，代价是重新加载模型。</translation>
+    </message>
 </context>
 <context>
     <name>DialogCloseButton</name>

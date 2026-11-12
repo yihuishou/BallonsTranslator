@@ -523,6 +523,11 @@ class ProgramConfig(Config):
     text_correction_model_path: str = ''
     text_correction_device: str = ''
     text_correction_batch_size: int = 8
+    # Empty means "use the instruction the model was trained with"; the sentence
+    # is always appended on its own line, so a custom prompt only replaces the
+    # instruction part.
+    text_correction_prompt: str = ''
+    text_correction_max_new_tokens: int = 1024
     # Loading costs ~10 s and 7.5 GB of VRAM, so a whole-project run keeps the
     # model resident; one-off page checks release it when they finish.
     text_correction_keep_loaded: bool = True
