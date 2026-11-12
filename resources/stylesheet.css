@@ -1519,31 +1519,32 @@ AlignmentChecker#AlignRightChecker::indicator:checked {
 }
 
 QPushButton#LptxtGroupButton {
-    min-height: 22px;
-    max-height: 22px;
-    padding: 0px 10px;
-    border-radius: 4px;
+    /* Flat pill matching the text panel's Add buttons: the generic
+       QPushButton height/border must be overridden here, otherwise the group
+       row keeps the taller boxed look. */
+    height: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0px 12px;
+    border-radius: 6px;
     font-size: 12px;
     color: @qwidgetForegroundColor;
-    background-color: @pushBtnBackgroundColor;
-    border: 1px solid @borderColor;
+    background-color: transparent;
+    border: 1px solid transparent;
 }
 
 QPushButton#LptxtGroupButton:hover {
     color: rgb(30, 147, 229);
-    border-color: rgb(30, 147, 229);
     background-color: rgba(30, 147, 229, 20%);
 }
 
 QPushButton#LptxtGroupButton:checked {
     color: white;
     background-color: rgb(30, 147, 229);
-    border-color: rgb(30, 147, 229);
 }
 
 QPushButton#LptxtGroupButton:disabled {
     color: rgba(128, 128, 128, 128);
-    border-color: @borderColor;
     background-color: transparent;
 }
 
