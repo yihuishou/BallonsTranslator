@@ -1,7 +1,8 @@
-from typing import Iterable, Optional
+from typing import Iterable, List, Optional
 
 from qtpy.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QComboBox,
     QCompleter,
     QFrame,
@@ -66,6 +67,7 @@ from ...custom_widget import (
     TextCheckerLabel,
     Widget,
 )
+from ...adaptive_wrap_layout import AdaptiveWrapLayout
 from ..item import TextBlkItem
 from ..font_family import qfont_with_family
 from ..annotations import (
@@ -886,17 +888,20 @@ class FontFormatPanel(Widget):
         self.familybox.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
 
         # Label TXT group selector: assigns the selected text block to one of the
-        # configured Photoshop action groups. An empty/unknown group name
-        # resolves to the first configured group (the default assignment).
-        self.group_label = QLabel(self.tr('分组'), self)
-        self.group_label.setObjectName('LptxtGroupLabel')
-        self.group_combo = QComboBox(self)
-        self.group_combo.setObjectName('LptxtGroupCombo')
-        self.group_combo.setToolTip(self.tr('将文本框分配到 Label TXT 分组'))
-        self.group_combo.setSizePolicy(
-            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
-        )
-        self.group_combo.currentTextChanged.connect(self.on_group_changed)
+        # configured Photoshop action groups. Every configured group is shown at
+        # once as a toggle button; the group currently in use by the selection
+        # is highlighted, and clicking a button applies that group right away.
+        # An empty/unknown group name resolves to the first configured group
+        # (the default assignment).
+        self.group_button_group = QButtonGroup(self)
+        self.group_button_group.setExclusive(True)
+        self.group_button_group.idClicked.connect(self.on_group_button_clicked)
+        self.group_buttons: List[QPushButton] = []
+        self.group_button_row = QWidget(self)
+        self.group_button_row.setObjectName('LptxtGroupButtonRow')
+        self.group_button_layout = AdaptiveWrapLayout(self.group_button_row)
+        self.group_button_layout.setContentsMargins(0, 0, 0, 0)
+        self.group_button_layout.setItemAlignment(Qt.AlignmentFlag.AlignHCenter)
         self.refresh_group_options()
 
         self.reloadFontsButton = None
@@ -1102,21 +1107,17 @@ class FontFormatPanel(Widget):
         hl4.setStretch(0, 1)
         hl4.setStretch(1, 1)
         hl4.setStretch(2, 1)
-        hl4.setContentsMargins(0, 11, 0, 0)
+        hl4.setContentsMargins(0, 5, 0, 0)
         hl4.setSpacing(0)
 
         self.vlayout.addLayout(vl0)
         self.vlayout.addLayout(hl1)
-
-        group_hlayout = QHBoxLayout()
-        group_hlayout.setContentsMargins(0, 0, 0, 0)
-        group_hlayout.setSpacing(7)
-        group_hlayout.addWidget(self.group_label)
-        group_hlayout.addWidget(self.group_combo, 1)
-        self.vlayout.addLayout(group_hlayout)
-
         self.vlayout.addLayout(hl3)
         self.vlayout.addLayout(hl2)
+
+        # The group buttons sit right below the alignment row.
+        self.vlayout.addWidget(self.group_button_row)
+
         self.vlayout.addLayout(hl4)
         self.vlayout.setContentsMargins(0, 0, 6, 0)
         self.vlayout.setSpacing(0)
@@ -1549,42 +1550,77 @@ class FontFormatPanel(Widget):
         return font_format.font_family
 
     def refresh_group_options(self) -> None:
-        """Repopulate the group combo from the configured Label TXT groups."""
+        """Rebuild the group buttons from the configured Label TXT groups."""
         groups = getattr(C.pcfg, 'lptxt_text_labels', None) or []
         names = [g.get('name', '') for g in groups if g.get('name')]
-        with QSignalBlocker(self.group_combo):
-            self.group_combo.clear()
-            if names:
-                self.group_combo.addItems(names)
-        self._update_group_tooltip()
 
-    def _update_group_tooltip(self) -> None:
-        """Explain the selected group's font override in the combo tooltip."""
-        name = self.group_combo.currentText()
+        # Remember the currently active group so a refresh keeps the highlight.
+        active = self.current_group_name()
+
+        for button in self.group_buttons:
+            self.group_button_group.removeButton(button)
+            self.group_button_layout.removeWidget(button)
+            button.setParent(None)
+            button.deleteLater()
+        self.group_buttons.clear()
+
+        for name in names:
+            button = QPushButton(name, self.group_button_row)
+            button.setObjectName('LptxtGroupButton')
+            button.setCheckable(True)
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setSizePolicy(
+                QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed
+            )
+            button.setToolTip(self._group_tooltip(name))
+            self.group_button_group.addButton(button)
+            self.group_button_layout.addWidget(button)
+            self.group_buttons.append(button)
+
+        # Prefer the selected block's group; fall back to the remembered one.
+        blk = getattr(self.textblk_item, 'blk', None)
+        if blk is not None:
+            active = C.resolve_lptxt_group_name(blk.group)
+        self.set_group_button_checked(active)
+        self.group_button_row.setVisible(bool(names))
+
+    def current_group_name(self) -> str:
+        """Return the name of the currently highlighted group button."""
+        checked = self.group_button_group.checkedButton()
+        if checked is None:
+            return ''
+        return checked.text()
+
+    def _group_tooltip(self, name: str) -> str:
+        """Explain a group's font override in its button tooltip."""
         font = C.get_lptxt_group_font(name)
         if font:
-            self.group_combo.setToolTip(
-                self.tr('分组：{name}（字体：{font}，覆盖文本默认字体）').format(
-                    name=name, font=font
-                )
+            return self.tr('分组：{name}（字体：{font}，覆盖文本默认字体）').format(
+                name=name, font=font
             )
-        else:
-            self.group_combo.setToolTip(self.tr('将文本框分配到 Label TXT 分组'))
+        return self.tr('将文本框分配到 Label TXT 分组：{name}').format(name=name)
 
-    def set_group_combo_for_block(self, blk) -> None:
-        """Show the block's group in the combo (defaulting to the first group)."""
+    def set_group_button_checked(self, name: str) -> None:
+        """Highlight the given group button (no-op if it no longer exists)."""
+        for button in self.group_buttons:
+            if button.text() == name:
+                button.setChecked(True)
+                return
+
+    def set_group_button_for_block(self, blk) -> None:
+        """Highlight the block's group (defaulting to the first group)."""
         if blk is None:
-            self.group_combo.setEnabled(False)
             name = C.first_lptxt_group_name()
         else:
-            self.group_combo.setEnabled(True)
             name = C.resolve_lptxt_group_name(blk.group)
-        with QSignalBlocker(self.group_combo):
-            idx = self.group_combo.findText(name)
-            if idx < 0 and self.group_combo.count() > 0:
-                idx = 0
-            self.group_combo.setCurrentIndex(max(idx, 0))
-        self._update_group_tooltip()
+        self.set_group_button_checked(name)
+
+    def on_group_button_clicked(self, button_id: int) -> None:
+        """Apply the clicked group to the selected text block."""
+        button = self.group_button_group.button(button_id)
+        if button is None:
+            return
+        self.on_group_changed(button.text())
 
     def on_group_changed(self, name: str) -> None:
         if not name or self.textblk_item is None:
@@ -1601,7 +1637,7 @@ class FontFormatPanel(Widget):
         if effective:
             with QSignalBlocker(self.familybox):
                 self.familybox.set_current_family(effective)
-        self._update_group_tooltip()
+        self.set_group_button_checked(name)
         self.group_changed.emit()
 
     def on_active_textstyle_label_changed(self):
@@ -1713,7 +1749,7 @@ class FontFormatPanel(Widget):
                     update_effect_panel=not transform_items,
                 )
                 self.set_globalfmt_title()
-                self.set_group_combo_for_block(None)
+                self.set_group_button_for_block(None)
             if transform_items and not preserve_local_owner:
                 self.texttransform_panel.set_transform_items(transform_items)
                 self.texteffect_panel.set_effect_items(effect_items)
@@ -1730,7 +1766,7 @@ class FontFormatPanel(Widget):
                 )
                 self.texteffect_panel.set_effect_items([textblk_item])
                 self.textstyle_panel.setTitle(f'TextBlock #{textblk_item.idx}')
-                self.set_group_combo_for_block(textblk_item.blk)
+                self.set_group_button_for_block(textblk_item.blk)
 
     def _owns_widget(self, widget: Optional[QWidget]) -> bool:
         """Return whether a child or top-level popup belongs to this panel."""

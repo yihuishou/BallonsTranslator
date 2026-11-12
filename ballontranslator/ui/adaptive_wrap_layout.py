@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Optional, Sequence
 
-from qtpy.QtCore import QRect, QSize
+from qtpy.QtCore import QRect, QSize, Qt
 from qtpy.QtWidgets import QLayout, QLayoutItem, QSizePolicy, QStyle, QWidget
 
 
@@ -67,9 +67,19 @@ class AdaptiveWrapLayout(QLayout):
         self._items = []
         self._horizontal_spacing = horizontal_spacing
         self._vertical_spacing = vertical_spacing
+        self._item_alignment = Qt.AlignmentFlag.AlignLeft
 
     def addItem(self, item: QLayoutItem) -> None:
         self._items.append(item)
+
+    def setItemAlignment(self, alignment: Qt.Alignment) -> None:
+        """Align the items of every row horizontally within the layout.
+
+        Only ``Qt.AlignmentFlag.AlignHCenter`` is honoured; any other value
+        keeps the default left alignment.
+        """
+        self._item_alignment = alignment
+        self.invalidate()
 
     def count(self) -> int:
         return len(self._items)
@@ -177,7 +187,10 @@ class AdaptiveWrapLayout(QLayout):
                 for index, width in zip(row, widths)
             ]
             row_height = max(heights, default=0)
+            row_width = sum(widths) + horizontal_spacing * (len(row) - 1)
             x = content_x
+            if self._item_alignment & Qt.AlignmentFlag.AlignHCenter:
+                x += max(0, (available_width - row_width) // 2)
             for index, width in zip(row, widths):
                 if not test_only:
                     items[index].setGeometry(

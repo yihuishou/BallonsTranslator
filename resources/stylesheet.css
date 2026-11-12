@@ -1518,6 +1518,35 @@ AlignmentChecker#AlignRightChecker::indicator:checked {
     image: url(resources/icons/fontfmt_alignr_activate.svg);
 }
 
+QPushButton#LptxtGroupButton {
+    min-height: 22px;
+    max-height: 22px;
+    padding: 0px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: @qwidgetForegroundColor;
+    background-color: @pushBtnBackgroundColor;
+    border: 1px solid @borderColor;
+}
+
+QPushButton#LptxtGroupButton:hover {
+    color: rgb(30, 147, 229);
+    border-color: rgb(30, 147, 229);
+    background-color: rgba(30, 147, 229, 20%);
+}
+
+QPushButton#LptxtGroupButton:checked {
+    color: white;
+    background-color: rgb(30, 147, 229);
+    border-color: rgb(30, 147, 229);
+}
+
+QPushButton#LptxtGroupButton:disabled {
+    color: rgba(128, 128, 128, 128);
+    border-color: @borderColor;
+    background-color: transparent;
+}
+
 QFontChecker {
     max-width: 31px;
 }

@@ -384,7 +384,7 @@ Windows 便携包由 `scripts/build_win_minimal.ps1` 生成（CI 使用 Python 3
 | 配置项与默认值 | `utils/config.py`（`ProgramConfig` / `ModuleConfig` / `DrawPanelConfig`） |
 | 项目 JSON 结构、页/图状态 | `utils/proj_imgtrans.py`、`utils/textblock.py` |
 | LabelPlus txt 导出、头部备注/Photoshop 动作分组 | `utils/lptxt_export.py`（`build_lptxt_header`，默认备注为「备注」）、`ui/configpanel.py` 的 `lptxt` 页、`ProgramConfig.lptxt_note` / `lptxt_text_labels`（序号仅显示，不写入 txt） |
-| 文本框分组标识与分组字体覆盖 | `utils/textblock.py` 的 `TextBlock.group` / `effective_font_family` / `group_font_override`、`utils/config.py` 的 `first_lptxt_group_name` / `resolve_lptxt_group_name` / `get_lptxt_group_font`、`ui/text_engine/formatting/panel.py` 的 `FontFormatPanel.group_combo`（「分组」下拉，默认首个分组，改动写入 `blk.group` 并发 `group_changed`）、`ui/text_engine/item.py` 的 `set_fontformat`/`get_fontformat`（分组字体只覆盖渲染，不覆盖存储）、`ui/mainwindow.py:on_lptxt_groups_changed`（设置改动后批量重算） |
+| 文本框分组标识与分组字体覆盖 | `utils/textblock.py` 的 `TextBlock.group` / `effective_font_family` / `group_font_override`、`utils/config.py` 的 `first_lptxt_group_name` / `resolve_lptxt_group_name` / `get_lptxt_group_font`、`ui/text_engine/formatting/panel.py` 的 `FontFormatPanel.group_buttons`（分组按钮组平铺展示全部分组，位于「对齐」行下方，无文字标签、`AdaptiveWrapLayout` 居中换行排列，当前分组高亮、点击即改分组并写入 `blk.group`，发 `group_changed`）、`ui/text_engine/item.py` 的 `set_fontformat`/`get_fontformat`（分组字体只覆盖渲染，不覆盖存储）、`ui/mainwindow.py:on_lptxt_groups_changed`（设置改动后批量重算） |
 | 文本排版、字体、描边特效、变换 | `ui/text_engine/` + `doc/ui/text_engine.md` |
 | 画布交互、绘制工具、抹字手势 | `ui/canvas.py`、`ui/drawingpanel.py` + `doc/ui/draw_panel.md` |
 | 流水线执行、线程、进度与取消 | `ui/module_manager.py` |

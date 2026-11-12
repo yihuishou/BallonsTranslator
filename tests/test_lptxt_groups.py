@@ -4,7 +4,8 @@ from unittest.mock import patch
 
 os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
 
-from qtpy.QtWidgets import QApplication
+from qtpy.QtCore import QPoint
+from qtpy.QtWidgets import QApplication, QLabel
 
 from ballontranslator.ui import shared_widget as SW
 from ballontranslator.ui.canvas import Canvas
@@ -193,25 +194,32 @@ class FontFormatPanelGroupTests(unittest.TestCase):
         self.addCleanup(self.canvas.gv.deleteLater)
         self.addCleanup(self.panel.deleteLater)
 
-    def test_group_combo_lists_configured_groups(self):
-        names = [
-            self.panel.group_combo.itemText(i)
-            for i in range(self.panel.group_combo.count())
-        ]
-        self.assertEqual(names, ['框内', '旁白', '框外'])
+    def _group_names(self):
+        return [b.text() for b in self.panel.group_buttons]
 
-    def test_group_combo_defaults_to_first_group(self):
+    def _click_group(self, name):
+        """Click the group button with the given name."""
+        for button in self.panel.group_buttons:
+            if button.text() == name:
+                button.click()
+                return
+        raise AssertionError(f'group button not found: {name}')
+
+    def test_group_buttons_list_configured_groups(self):
+        self.assertEqual(self._group_names(), ['框内', '旁白', '框外'])
+
+    def test_group_buttons_default_to_first_group(self):
         self.panel.set_textblk_item(self.item)
-        self.assertEqual(self.panel.group_combo.currentText(), '框内')
+        self.assertEqual(self.panel.current_group_name(), '框内')
 
-    def test_group_combo_shows_the_block_group(self):
+    def test_group_buttons_show_the_block_group(self):
         self.block.group = '旁白'
         self.panel.set_textblk_item(self.item)
-        self.assertEqual(self.panel.group_combo.currentText(), '旁白')
+        self.assertEqual(self.panel.current_group_name(), '旁白')
 
-    def test_changing_group_writes_to_the_block(self):
+    def test_clicking_group_writes_to_the_block(self):
         self.panel.set_textblk_item(self.item)
-        self.panel.group_combo.setCurrentText('旁白')
+        self._click_group('旁白')
         self.assertEqual(self.block.group, '旁白')
         # The group font now drives the rendering.
         self.assertEqual(
@@ -220,27 +228,31 @@ class FontFormatPanelGroupTests(unittest.TestCase):
         # ...without overwriting the block's own font family.
         self.assertEqual(self.block.fontformat.font_family, 'OwnFontB')
 
+    def test_clicking_group_highlights_it(self):
+        self.panel.set_textblk_item(self.item)
+        self._click_group('框外')
+        self.assertEqual(self.panel.current_group_name(), '框外')
+        checked = self.panel.group_button_group.checkedButton()
+        self.assertIsNotNone(checked)
+        self.assertTrue(checked.isChecked())
+
     def test_refresh_group_options_repopulates(self):
         with patch.object(
             C.pcfg, 'lptxt_text_labels', [{'name': '新组', 'font': ''}]
         ):
             self.panel.refresh_group_options()
-        names = [
-            self.panel.group_combo.itemText(i)
-            for i in range(self.panel.group_combo.count())
-        ]
-        self.assertEqual(names, ['新组'])
+        self.assertEqual(self._group_names(), ['新组'])
 
     def test_group_change_emits_signal(self):
         self.panel.set_textblk_item(self.item)
         seen = []
         self.panel.group_changed.connect(lambda: seen.append(True))
-        self.panel.group_combo.setCurrentText('框外')
+        self._click_group('框外')
         self.assertTrue(seen)
 
     def test_family_box_shows_effective_group_font(self):
         self.panel.set_textblk_item(self.item)
-        self.panel.group_combo.setCurrentText('旁白')
+        self._click_group('旁白')
         # The box must show the font the canvas actually renders with.
         self.assertEqual(self.panel.familybox.currentText(), 'GroupFontA')
         self.assertEqual(
@@ -251,6 +263,45 @@ class FontFormatPanelGroupTests(unittest.TestCase):
         self.block.group = '框外'
         self.panel.set_textblk_item(self.item)
         self.assertEqual(self.panel.familybox.currentText(), 'OwnFontB')
+
+    def test_no_group_text_label_is_shown(self):
+        # The group row shows the group chips only; no "分组" caption.
+        self.assertFalse(hasattr(self.panel, 'group_label'))
+        labels = [
+            child.text()
+            for child in self.panel.findChildren(QLabel)
+            if child.objectName() == 'LptxtGroupLabel'
+        ]
+        self.assertEqual(labels, [])
+
+    def test_group_buttons_are_centered_in_the_row(self):
+        self.panel.resize(380, 620)
+        self.panel.show()
+        self.app.processEvents()
+        row = self.panel.group_button_row
+        first = self.panel.group_buttons[0]
+        last = self.panel.group_buttons[-1]
+        left_gap = first.mapTo(row, QPoint(0, 0)).x()
+        right_gap = row.width() - (
+            last.mapTo(row, QPoint(0, 0)).x() + last.width()
+        )
+        self.assertAlmostEqual(left_gap, right_gap, delta=1)
+        self.assertGreater(left_gap, 0)
+
+    def test_group_row_is_close_to_the_row_below(self):
+        self.panel.resize(380, 620)
+        self.panel.show()
+        self.app.processEvents()
+
+        def top(widget):
+            return widget.mapTo(self.panel, QPoint(0, 0)).y()
+
+        gap = top(self.panel.foldTextBtn) - (
+            top(self.panel.group_button_row)
+            + self.panel.group_button_row.height()
+        )
+        self.assertLessEqual(gap, 8)
+        self.assertGreaterEqual(gap, 0)
 
 
 if __name__ == '__main__':
