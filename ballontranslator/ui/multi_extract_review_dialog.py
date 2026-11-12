@@ -139,7 +139,12 @@ class _DiffTextLabel(QWidget):
 
 
 class MultiExtractReviewDialog(QDialog):
-    """Pick a reading for each block the extraction passes disagreed on."""
+    """Pick a reading for each block the extraction passes disagreed on.
+
+    The dialog runs beside the main window so the reviewed block stays
+    visible on the canvas: picking an entry reports its page and block to the
+    owner, which scrolls the scene to that block.
+    """
 
     applied = Signal(int)
 
@@ -147,11 +152,13 @@ class MultiExtractReviewDialog(QDialog):
         self,
         project,
         apply_callback: Optional[Callable[[str, TextBlock, int], None]] = None,
+        locate_callback: Optional[Callable[[str, TextBlock], None]] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
         self.project = project
         self._apply_callback = apply_callback
+        self._locate_callback = locate_callback
         self._page_cache = {}
         self._resolved = set()
         self._entries: List[Tuple[str, TextBlock]] = []
@@ -306,6 +313,21 @@ class MultiExtractReviewDialog(QDialog):
         self.preview_label.setPixmap(self._crop_pixmap(page, block))
         self._rebuild_readings(block)
         self.status_label.clear()
+        self._locate(page, block)
+
+    def _locate(self, page: str, block: TextBlock) -> None:
+        """Report the picked entry so the owner can show it on the canvas.
+
+        The dialog cannot move the canvas itself, so the window that owns the
+        scene performs the navigation; the dialog only names the block.
+        """
+        if self._locate_callback is None:
+            return
+        self._locate_callback(page, block)
+
+    def refresh(self) -> None:
+        """Rebuild the list from the project's current conflicts."""
+        self._rebuild_list()
 
     def _clear_readings(self) -> None:
         for button in self._radio_buttons:

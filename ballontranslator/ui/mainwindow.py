@@ -186,6 +186,9 @@ class MainWindow(mainwindow_cls):
         self._extract_stage_backup = None
         # Pass queue of an in-flight multi-pass extraction run.
         self._multi_extract_state = None
+        # Open multi-pass review window; it lives beside the canvas so the
+        # reviewed block stays visible while the list is walked.
+        self._multi_extract_review_dialog: Optional[MultiExtractReviewDialog] = None
 
         self.setupThread()
         self.setupUi()
@@ -2828,16 +2831,97 @@ class MainWindow(mainwindow_cls):
         if pending == 0:
             create_info_dialog(self.tr('No multi-pass conflicts to review.'))
             return
+        dialog = self._multi_extract_review_dialog
+        if dialog is not None:
+            if dialog.project is self.imgtrans_proj:
+                dialog.refresh()
+                dialog.show()
+                dialog.raise_()
+                dialog.activateWindow()
+                return
+            # The project was replaced while the dialog was open; its entries
+            # describe the previous one and cannot be reviewed any more.
+            dialog.reject()
         dialog = MultiExtractReviewDialog(
             self.imgtrans_proj,
             apply_callback=self._apply_multi_extract_reading,
+            locate_callback=self._locate_multi_extract_block,
             parent=self,
         )
-        try:
-            dialog.exec_()
-        finally:
+        self._multi_extract_review_dialog = dialog
+        dialog.finished.connect(self._on_multi_extract_review_closed)
+        dialog.show()
+        self._place_multi_extract_review_dialog(dialog)
+        dialog.raise_()
+        dialog.activateWindow()
+
+    def _place_multi_extract_review_dialog(self, dialog) -> None:
+        """Keep the dialog clear of the canvas' middle.
+
+        The canvas centers the reviewed block, so a dialog parked over that
+        spot would hide exactly what the review is about.
+        """
+        margin = 20
+        screen = self.screen() or QGuiApplication.primaryScreen()
+        if screen is None:
+            return
+        area = screen.availableGeometry()
+        width = min(dialog.width(), area.width() - 2 * margin)
+        height = min(dialog.height(), area.height() - 2 * margin)
+        dialog.resize(width, height)
+        corners = (
+            (area.right() - width - margin, area.bottom() - height - margin),
+            (area.left() + margin, area.bottom() - height - margin),
+            (area.right() - width - margin, area.top() + margin),
+            (area.left() + margin, area.top() + margin),
+        )
+        center = self._canvas_center_on_screen()
+        position = corners[-1]
+        for x, y in corners:
+            covers_center = (
+                x <= center.x() <= x + width and y <= center.y() <= y + height
+            )
+            if not covers_center:
+                position = (x, y)
+                break
+        dialog.move(*position)
+
+    def _canvas_center_on_screen(self) -> QPoint:
+        """Where the canvas shows its middle, in screen coordinates."""
+        view = self.canvas.gv
+        middle = view.viewport().mapTo(view, view.viewport().rect().center())
+        return view.mapToGlobal(middle)
+
+    def _on_multi_extract_review_closed(self, _result: int) -> None:
+        dialog = self._multi_extract_review_dialog
+        self._multi_extract_review_dialog = None
+        if dialog is not None:
             dialog.deleteLater()
         self._refresh_multi_extract_review_action()
+
+    def _locate_multi_extract_block(self, page: str, blk: TextBlock) -> None:
+        """Show the reviewed block on the canvas: its page, then its center.
+
+        The review dialog cannot drive the scene, so the window that owns it
+        performs the navigation: the page is switched first, then the block
+        itself is centered in the view.
+        """
+        page_index = self.imgtrans_proj.pagename2idx(page)
+        if page_index < 0:
+            return
+        if self.imgtrans_proj.current_img != page:
+            self.pageList.setCurrentRow(page_index)
+        item = next(
+            (
+                candidate
+                for candidate in self.st_manager.textblk_item_list
+                if candidate.blk is blk
+            ),
+            None,
+        )
+        if item is None:
+            return
+        self.canvas.gv.centerOn(item.sceneBoundingRect().center())
 
     def _apply_multi_extract_reading(self, page: str, blk, pass_index: int) -> None:
         """Write one reviewed reading to the block's source text.

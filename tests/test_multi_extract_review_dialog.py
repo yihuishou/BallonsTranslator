@@ -297,6 +297,68 @@ class ReadingHighlightTest(unittest.TestCase):
         self.assertEqual(dialog._reading_labels[0].plain_text(), 'い')
 
 
+class LocateCallbackTest(unittest.TestCase):
+    """The dialog names the picked block so the canvas can follow it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.app = get_app()
+
+    def _dialog(self, pages, locate=None):
+        dialog = MultiExtractReviewDialog(
+            FakeProject(pages), locate_callback=locate
+        )
+        self.addCleanup(dialog.deleteLater)
+        return dialog
+
+    def test_the_first_entry_is_reported_when_the_list_appears(self):
+        seen = []
+        block = make_block('あ', candidates=['あ1'])
+        self._dialog(
+            {'a.jpg': [block]},
+            locate=lambda page, blk: seen.append((page, blk)),
+        )
+
+        self.assertEqual(seen, [('a.jpg', block)])
+
+    def test_switching_entries_reports_the_new_one(self):
+        seen = []
+        first = make_block('あ', candidates=['あ1'])
+        second = make_block('い', candidates=['い1'])
+        dialog = self._dialog(
+            {'a.jpg': [first], 'b.jpg': [second]},
+            locate=lambda page, blk: seen.append((page, blk)),
+        )
+        seen.clear()
+
+        dialog.list_widget.setCurrentRow(1)
+        self.app.processEvents()
+
+        self.assertEqual(seen, [('b.jpg', second)])
+
+    def test_a_missing_callback_is_tolerated(self):
+        block = make_block('あ', candidates=['あ1'])
+        dialog = self._dialog({'a.jpg': [block]})
+
+        dialog.list_widget.setCurrentRow(0)
+        self.app.processEvents()
+
+        self.assertIs(dialog.current_entry()[1], block)
+
+    def test_refreshing_reports_the_entries_again(self):
+        seen = []
+        block = make_block('あ', candidates=['あ1'])
+        dialog = self._dialog(
+            {'a.jpg': [block]},
+            locate=lambda page, blk: seen.append((page, blk)),
+        )
+        seen.clear()
+
+        dialog.refresh()
+
+        self.assertEqual(seen, [('a.jpg', block)])
+
+
 class PrefixedTest(unittest.TestCase):
 
     def test_short_text_is_kept(self):
