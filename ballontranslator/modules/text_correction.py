@@ -57,12 +57,6 @@ _REQUIRED_FILES = (
     'model-00002-of-00002.safetensors',
 )
 
-# Already-downloaded copies are reused instead of pulling 8 GB again. The
-# environment variable wins over the bundled local path.
-LOCAL_MODEL_CANDIDATES = (
-    'J:/ChineseErrorCorrector4-4B',
-)
-
 CHINESE_TARGET_LANGS = ('简体中文', '繁體中文')
 
 _THINK_BLOCK_RE = re.compile(r'<think>(.*?)</think>', re.DOTALL | re.IGNORECASE)
@@ -147,6 +141,11 @@ def model_is_complete(model_dir: str) -> bool:
 def resolve_model_dir(configured: str = '') -> str:
     """Pick the first usable local copy, else the directory downloads target.
 
+    The explicit setting wins, then the environment variable, then the folder
+    downloads go to. No fixed path is probed: a copy kept elsewhere has to be
+    named by one of the first two, so a missing drive cannot silently shadow
+    the copy this installation downloaded.
+
     >>> resolve_model_dir().endswith('ChineseErrorCorrector4-4B')
     True
     """
@@ -158,7 +157,6 @@ def resolve_model_dir(configured: str = '') -> str:
     if env_dir:
         candidates.append(env_dir)
     candidates.append(default_model_dir())
-    candidates.extend(LOCAL_MODEL_CANDIDATES)
     for candidate in candidates:
         if model_is_complete(candidate):
             return candidate
