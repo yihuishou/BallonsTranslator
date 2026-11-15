@@ -617,6 +617,7 @@ class BottomBar(Widget):
     textedit_checkchanged = Signal()
     paintmode_checkchanged = Signal()
     textblock_checkchanged = Signal()
+    group_display_checkchanged = Signal(bool)
 
     def __init__(self, mainwindow: QMainWindow, *args, **kwargs) -> None:
         super().__init__(mainwindow, *args, **kwargs)
@@ -649,6 +650,11 @@ class BottomBar(Widget):
         self.textblockChecker = QCheckBox()
         self.textblockChecker.setObjectName('TextblockChecker')
         self.textblockChecker.clicked.connect(self.onTextblockCheckerClicked)
+        self.groupDisplayChecker = QCheckBox()
+        self.groupDisplayChecker.setObjectName('GroupDisplayChecker')
+        self.groupDisplayChecker.setToolTip(self.tr('Enable/disable group display'))
+        self.groupDisplayChecker.setChecked(pcfg.imgtrans_group_display)
+        self.groupDisplayChecker.clicked.connect(self.onGroupDisplayCheckerPressed)
         
         self.originalSlider = PaintQSlider(self.tr("Original image opacity"), Qt.Orientation.Horizontal, self)
         self.originalSlider.setFixedWidth(150)
@@ -669,6 +675,7 @@ class BottomBar(Widget):
         self.hlayout.addSpacerItem(QSpacerItem(0, 0, QSizePolicy.Expanding, QSizePolicy.Minimum))
         self.hlayout.addWidget(self.editingLayerSlider)
         self.hlayout.addWidget(self.originalSlider)
+        self.hlayout.addWidget(self.groupDisplayChecker)
         self.hlayout.addWidget(self.paintChecker)
         self.hlayout.addWidget(self.texteditChecker)
         self.hlayout.addWidget(self.textblockChecker)
@@ -691,3 +698,8 @@ class BottomBar(Widget):
 
     def onTextblockCheckerClicked(self):
         self.textblock_checkchanged.emit()
+
+    def onGroupDisplayCheckerPressed(self):
+        checked = self.groupDisplayChecker.isChecked()
+        pcfg.imgtrans_group_display = checked
+        self.group_display_checkchanged.emit(checked)

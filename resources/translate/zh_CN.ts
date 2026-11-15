@@ -85,6 +85,11 @@
         <translation>文本检测</translation>
     </message>
     <message>
+        <location filename="../../ballontranslator/ui/mainwindowbars.py" line="627"/>
+        <source>Enable/disable group display</source>
+        <translation>启用/禁用分组显示</translation>
+    </message>
+    <message>
         <location filename="../../ballontranslator/ui/mainwindowbars.py" line="618"/>
         <source>OCR</source>
         <translation>OCR</translation>

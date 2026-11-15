@@ -374,6 +374,7 @@ QCheckBox#TransChecker::indicator,
 QCheckBox#PaintChecker::indicator,
 QCheckBox#TexteditChecker::indicator,
 QCheckBox#TextblockChecker::indicator,
+QCheckBox#GroupDisplayChecker::indicator,
 QCheckBox#ShowPageListChecker::indicator,
 QCheckBox#GlobalSearchChecker::indicator,
 QCheckBox#ConfigChecker::indicator,
@@ -2016,6 +2017,24 @@ QCheckBox#TextblockChecker::indicator:hover {
 
 QCheckBox#TextblockChecker::indicator:checked{
     image: url(resources/icons/bottombar_textblock_activate.svg);
+}
+
+QCheckBox#GroupDisplayChecker::indicator {
+    padding-left: 8px;
+    padding-right: 8px;
+    padding-top: 3px;
+    padding-bottom: 3px;
+    height: 28px;
+    width: 28px;
+    image: url(resources/icons/bottombar_groupdisplay.svg);
+}
+
+QCheckBox#GroupDisplayChecker::indicator:hover {
+    background-color: rgba(30, 147, 229, 20%);
+}
+
+QCheckBox#GroupDisplayChecker::indicator:checked {
+    image: url(resources/icons/bottombar_groupdisplay_activate.svg);
 }
 
 OpenBtn {

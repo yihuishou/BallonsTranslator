@@ -465,6 +465,9 @@ class ProgramConfig(Config):
     imgtrans_paintmode: bool = False
     imgtrans_textedit: bool = True
     imgtrans_textblock: bool = True
+    # Show each text block's Label TXT group next to its order badge, and
+    # enable the 1-9 digit shortcut that reassigns selected blocks' groups.
+    imgtrans_group_display: bool = False
     mask_transparency: float = 0.
     original_transparency: float = 0.
     open_recent_on_startup: bool = True 

@@ -30,7 +30,7 @@ from .page_search_widget import PageSearchWidget
 from .text_engine.editing.commands import MoveByKeyCommand
 from .text_engine.editing.move_session import TextItemMoveSession
 from ballontranslator.utils import shared
-from ballontranslator.utils.config import pcfg
+from ballontranslator.utils.config import pcfg, resolve_lptxt_group_name
 from ballontranslator.utils.proj_imgtrans import ProjImgTrans
 
 CANVAS_SCALE_MAX = 10.0
@@ -247,12 +247,14 @@ class Canvas(QGraphicsScene):
     path_reorder_finished = Signal(object)
     path_reorder_mode_changed = Signal(bool)
     projective_scale_requested = Signal(object)
+    text_group_changed = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.scale_factor = 1.
         self.textblock_mode = False
         self.order_badges_visible = True
+        self.group_badges_visible = False
         self.creating_textblock = False
         self._text_creation_cursor_active = False
         self.create_block_origin: QPointF = None
@@ -834,6 +836,9 @@ class Canvas(QGraphicsScene):
                 event.setAccepted(True)
                 return
         elif key in QNUMERIC_KEYS:
+            if self.assign_group_to_selected_items(QNUMERIC_KEYS[key]):
+                event.setAccepted(True)
+                return
             value = QNUMERIC_KEYS[key]
             self.set_active_layer_transparency(value * 10)
         return super().keyPressEvent(event)
@@ -1028,12 +1033,67 @@ class Canvas(QGraphicsScene):
             if isinstance(item, TextBlkItem):
                 item.set_order_badge_visible(visible)
 
+    def set_group_badges_visible(self, visible: bool) -> None:
+        """Toggle appending each block's Label TXT group to its order badge."""
+        visible = bool(visible)
+        if self.group_badges_visible == visible:
+            return
+        self.group_badges_visible = visible
+        for item in self.textLayer.childItems():
+            if isinstance(item, TextBlkItem):
+                item.set_group_badge_visible(visible)
+
+    def refresh_text_group_badges(self) -> None:
+        """Re-resolve badge group names after the Label TXT groups change."""
+        if not self.group_badges_visible:
+            return
+        for item in self.textLayer.childItems():
+            if isinstance(item, TextBlkItem):
+                item.refresh_order_badge()
+
+    def assign_group_to_selected_items(self, digit: int) -> bool:
+        """Assign the nth Label TXT group (1-9) to the selected text blocks.
+
+        Returns False when the shortcut does not apply so the digit key can
+        fall through to the layer-transparency shortcut.
+        """
+        if not self.group_badges_visible:
+            return False
+        digit = int(digit)
+        if digit == 0:
+            return False
+        selected = [
+            item for item in self.selected_text_items() if not item.isEditing()
+        ]
+        if not selected:
+            return False
+        groups = getattr(pcfg, 'lptxt_text_labels', None) or []
+        names = [g.get('name', '') for g in groups if g.get('name')]
+        if digit <= len(names):
+            name = names[digit - 1]
+            changed = False
+            for item in selected:
+                blk = getattr(item, 'blk', None)
+                if blk is None or resolve_lptxt_group_name(blk.group) == name:
+                    continue
+                blk.group = name
+                # Re-apply the format so a group font override takes effect
+                # immediately, and refresh the badge group name.
+                item.set_fontformat(item.fontformat)
+                item.refresh_order_badge()
+                changed = True
+            if changed:
+                self.setProjSaveState(True)
+                self.text_group_changed.emit()
+        return True
+
     def attach_text_item(self, item: TextBlkItem) -> None:
         """Attach a text item and its badge to their canvas-owned layers."""
         item.setParentItem(self.textLayer)
         item.effect_renderer.project_assets_changed()
         item.set_order_badge_layer(self.orderBadgeLayer)
         item.set_order_badge_visible(self.order_badges_visible)
+        item.set_group_badge_visible(self.group_badges_visible)
 
     def start_path_reorder(self) -> bool:
         """Start one path gesture that defines a new page reading order."""

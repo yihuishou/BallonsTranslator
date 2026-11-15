@@ -51,6 +51,7 @@ from .font_family import (
     font_family_for_project,
     qfont_with_family,
 )
+from ballontranslator.utils.config import resolve_lptxt_group_name
 from .editing.context_menu import create_text_edit_context_menu
 from ..misc import td_pattern, table_pattern
 from .horizontal_layout import HorizontalTextDocumentLayout
@@ -105,6 +106,8 @@ class _OrderBadgeItem(QGraphicsItem):
 
     HORIZONTAL_PADDING = 4
     VERTICAL_PADDING = 2
+    # Keep appended group names from turning the badge into a wide banner.
+    MAX_GROUP_NAME_CHARS = 12
 
     def __init__(self, parent: QGraphicsItem) -> None:
         super().__init__(parent)
@@ -127,8 +130,10 @@ class _OrderBadgeItem(QGraphicsItem):
     def boundingRect(self) -> QRectF:
         return QRectF(self._bounds)
 
-    def set_number(self, number: int) -> None:
+    def set_number(self, number: int, group_name: str = '') -> None:
         text = str(max(1, int(number)))
+        if group_name:
+            text += ' ' + self._group_display_name(group_name)
         if self._text == text:
             return
         metrics = QFontMetrics(self._font)
@@ -139,6 +144,13 @@ class _OrderBadgeItem(QGraphicsItem):
         # The bottom-left corner remains attached to the block's top-left.
         self._bounds = QRectF(0, -height, width, height)
         self.update()
+
+    @staticmethod
+    def _group_display_name(name: str) -> str:
+        limit = _OrderBadgeItem.MAX_GROUP_NAME_CHARS
+        if len(name) <= limit:
+            return name
+        return name[: limit - 1] + '…'
 
     def paint(
         self,
@@ -322,6 +334,7 @@ class TextBlkItem(QGraphicsTextItem):
         self.draw_rect = show_rect
         self._ui_guide_suppressed = False
         self._order_badge_visible = False
+        self._group_badge_visible = False
         self._order_number_override: Optional[int] = None
         self._order_badge_item: Optional[_OrderBadgeItem] = None
         self._conflict_badge_item: Optional[_ConflictBadgeItem] = None
@@ -1327,6 +1340,14 @@ class TextBlkItem(QGraphicsTextItem):
         self._order_badge_visible = visible
         self._sync_order_badge()
 
+    def set_group_badge_visible(self, visible: bool) -> None:
+        """Toggle appending the block's Label TXT group to its order badge."""
+        visible = bool(visible)
+        if self._group_badge_visible == visible:
+            return
+        self._group_badge_visible = visible
+        self._sync_order_badge()
+
     def set_order_badge_layer(
         self,
         layer: Optional[QGraphicsItem],
@@ -1353,6 +1374,13 @@ class TextBlkItem(QGraphicsTextItem):
         """Refresh the badge after the item's persistent index changes."""
         self._sync_order_badge()
 
+    def _badge_group_name(self) -> str:
+        """Return the block's resolved Label TXT group name for the badge."""
+        blk = self.blk
+        if blk is None:
+            return ''
+        return resolve_lptxt_group_name(blk.group)
+
     def _sync_order_badge(self) -> None:
         badge = self._order_badge_item
         if badge is None:
@@ -1366,7 +1394,10 @@ class TextBlkItem(QGraphicsTextItem):
             )
         )
         if visible:
-            badge.set_number(self.order_number())
+            group_name = (
+                self._badge_group_name() if self._group_badge_visible else ''
+            )
+            badge.set_number(self.order_number(), group_name)
             outline = self.geometry_controller.visual_outline_in_item()
             visible = not outline.isEmpty()
             if visible:

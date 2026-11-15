@@ -1636,6 +1636,7 @@ class FontFormatPanel(Widget):
         # effect immediately for rendering, and reflect the effective font in the
         # family box.
         self.textblk_item.set_fontformat(self.textblk_item.fontformat)
+        self.textblk_item.refresh_order_badge()
         effective = blk.effective_font_family
         if effective:
             with QSignalBlocker(self.familybox):

@@ -9,7 +9,7 @@ import time
 
 from tqdm import tqdm
 from qtpy.QtWidgets import QAction, QFileDialog, QMenu, QHBoxLayout, QVBoxLayout, QApplication, QStackedWidget, QSplitter, QListWidget, QShortcut, QListWidgetItem, QMessageBox, QTextEdit, QPlainTextEdit, QDialog, QWidget, QColorDialog
-from qtpy.QtCore import Qt, QPoint, QSize, QEvent, Signal, QTimer
+from qtpy.QtCore import Qt, QPoint, QSize, QEvent, QSignalBlocker, Signal, QTimer
 from qtpy.QtGui import QContextMenuEvent, QTextCursor, QGuiApplication, QIcon, QCloseEvent, QKeySequence, QPainter, QClipboard, QColor
 
 from ballontranslator.utils.logger import logger as LOGGER
@@ -658,6 +658,11 @@ class MainWindow(mainwindow_cls):
         self.textPanel.formatpanel.group_changed.connect(
             lambda: self.canvas.setProjSaveState(True)
         )
+        self.bottomBar.group_display_checkchanged.connect(
+            self.canvas.set_group_badges_visible
+        )
+        self.canvas.set_group_badges_visible(pcfg.imgtrans_group_display)
+        self.canvas.text_group_changed.connect(self.on_text_group_changed)
 
         textblock_mode = pcfg.imgtrans_textblock
         if pcfg.imgtrans_textedit:
@@ -864,6 +869,20 @@ class MainWindow(mainwindow_cls):
             if getattr(item, 'blk', None) is None:
                 continue
             item.set_fontformat(item.fontformat)
+        self.canvas.refresh_text_group_badges()
+
+    def on_text_group_changed(self) -> None:
+        """Sync the formatting panel after a canvas-side group change."""
+        items = self.canvas.selected_text_items()
+        if not items:
+            return
+        item = items[0]
+        panel = self.textPanel.formatpanel
+        panel.set_group_button_for_block(item.blk)
+        effective = getattr(item.blk, 'effective_font_family', '')
+        if effective:
+            with QSignalBlocker(panel.familybox):
+                panel.familybox.set_current_family(effective)
 
     def openDir(self, directory: str):
         try:
