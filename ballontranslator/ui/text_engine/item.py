@@ -53,7 +53,7 @@ from .font_family import (
 )
 from ballontranslator.utils.config import resolve_lptxt_group_name
 from .editing.context_menu import create_text_edit_context_menu
-from ..misc import td_pattern, table_pattern
+from ..misc import td_pattern, table_pattern, set_html_family
 from .horizontal_layout import HorizontalTextDocumentLayout
 from .vertical_layout import VerticalTextDocumentLayout
 from .effects.renderer import TextEffectRenderer
@@ -336,6 +336,7 @@ class TextBlkItem(QGraphicsTextItem):
         self._order_badge_visible = False
         self._group_badge_visible = False
         self._order_number_override: Optional[int] = None
+        self._syncing_render_family = False
         self._order_badge_item: Optional[_OrderBadgeItem] = None
         self._conflict_badge_item: Optional[_ConflictBadgeItem] = None
         self.old_ffmt_values = None
@@ -641,7 +642,55 @@ class TextBlkItem(QGraphicsTextItem):
             self.update()
 
     def repaint_background(self, render_scale: float = 1.0):
+        self._sync_render_family()
         return self.effect_renderer.repaint_background(render_scale)
+
+    def _sync_render_family(self) -> None:
+        """Make document fragments render with the effective (group) family.
+
+        A group font is a display-only override: the stored fontformat and the
+        serialized rich text (toHtml) keep the block's own family, while the
+        fragment char formats must carry the override family for the glyphs to
+        change. Text imports and format writes reset fragments to the stored
+        family, so re-sync here before the render surface is rebuilt.
+        """
+        blk = self.blk
+        if blk is None or self._syncing_render_family:
+            return
+        override = blk.group_font_override
+        self._group_override_family = override or None
+        family = override or blk.fontformat.font_family
+        if not family or self.layout is None:
+            return
+        if not self._fragments_need_family_sync(family):
+            return
+        self._syncing_render_family = True
+        try:
+            cursor = QTextCursor(self.document())
+            cursor.select(QTextCursor.SelectionType.Document)
+            cursor.beginEditBlock()
+            relayout_on_changed = self.layout.relayout_on_changed
+            self.layout.relayout_on_changed = False
+            try:
+                self._doc_set_font_family(family, cursor)
+            finally:
+                self.layout.relayout_on_changed = relayout_on_changed
+            cursor.endEditBlock()
+            self.layout.reLayoutEverything()
+        finally:
+            self._syncing_render_family = False
+
+    def _fragments_need_family_sync(self, family: str) -> bool:
+        """Check the head fragment; text imports reset every fragment to the
+        stored family, so the first fragment detects drift cheaply."""
+        block = self.document().firstBlock()
+        while block.isValid():
+            it = block.begin()
+            while not it.atEnd():
+                fragment = it.fragment()
+                return fragment.charFormat().font().family() != family
+            block = block.next()
+        return False
 
     def refresh_font_metrics(self) -> None:
         """Reshape live text without changing its formatting or undo history.
@@ -1670,6 +1719,10 @@ class TextBlkItem(QGraphicsTextItem):
         return super().hoverEnterEvent(event)
 
     def toHtml(self) -> str:
+        # Serialize the display family state the same way the canvas renders
+        # it; the group override (if any) is rewritten back to the block's own
+        # family below so storage never embeds a display-only override.
+        self._sync_render_family()
         html = super().toHtml()
         tables = table_pattern.findall(html)
         if tables:
@@ -1677,12 +1730,19 @@ class TextBlkItem(QGraphicsTextItem):
             html = tables[0] + td + '</body></html>'
 
         html = html.replace('>\n<', '><')
-        return to_rich_text_html(
+        html = to_rich_text_html(
             self.document(),
             html,
             line_spacing_fallback=self.fontformat.line_spacing,
             line_spacing_type_fallback=self.fontformat.line_spacing_type,
         )
+        blk = self.blk
+        if blk is not None:
+            override = blk.group_font_override
+            own = blk.fontformat.font_family
+            if override and own and override != own:
+                html = set_html_family(html, own)
+        return html
 
     def load_rich_text_html(self, html: str) -> None:
         """Restore HTML and annotations before painting their completed effects.
