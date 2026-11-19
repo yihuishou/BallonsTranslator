@@ -24,6 +24,7 @@ from ballontranslator.ui.codex_settings import CodexSettingsPanel
 from ballontranslator.ui.configpanel import ConfigPanel
 from ballontranslator.ui.mainwindow import MainWindow
 from ballontranslator.ui.module_manager import ModuleManager
+from ballontranslator.ui.module_parse_widgets import ModuleParamDialog
 from ballontranslator.ui.module_tool_button import ModuleSelectionWidget
 from ballontranslator.ui.run_pipeline_dialog import RunPipelineDialog
 from ballontranslator.utils.config import pcfg
@@ -75,6 +76,9 @@ class SelectionWindow(QWidget):
                 widget.llm_profile_changed.connect(profile_slot)
             setattr(self.bottomBar, attr, widget)
         self.module_manager.module_selection_changed.connect(self.on_module_selection_changed)
+
+    def _end_extract_only_run(self) -> None:
+        """This fake never starts an extract-only run, so there is nothing to end."""
 
 
 class ModuleSelectionMenuTest(unittest.TestCase):
@@ -157,12 +161,37 @@ class ModuleSelectionMenuTest(unittest.TestCase):
         with patch.object(RunPipelineDialog, 'exec_', interact):
             MainWindow.run_imgtrans(self.window)
 
+    def test_koharu_display_name_preserves_selection_key(self) -> None:
+        bottom = self.window.bottomBar.textdet_selector
+        bottom.menu.rebuildMenu()
+        action = next(a for a in bottom.menu.actions() if a.data() == 'koharu')
+        self.assertEqual(action.text().split('\t')[0], 'koharu-layout-highres')
+        action.trigger()
+        self.assertEqual(pcfg.module.textdetector, 'koharu')
+        self.assertEqual(bottom.selector.currentText(), 'koharu')
+        self.assertEqual(bottom.tool_btn.text().strip(), 'koharu-layout-highres')
+
+        run_dialog = RunPipelineDialog(self.window)
+        params_dialog = ModuleParamDialog('textdetector', 'koharu', {}, False)
+        try:
+            activator = next(a for a in run_dialog.module_activators if a.module_type == 'textdetector')
+            self.assertEqual(activator.module_combo.currentText(), 'koharu')
+            self.assertEqual(activator.selector.text(), 'koharu-layout-highres')
+            self.assertEqual(params_dialog.module_key, 'koharu')
+            self.assertEqual(params_dialog.windowTitle(), 'koharu-layout-highres')
+        finally:
+            run_dialog.deleteLater()
+            params_dialog.deleteLater()
+
     def test_profiles_are_filtered_and_languages_remain_bottom_bar_only(self) -> None:
         pcfg.module.llm_profiles.append(LLMProfile(
             id='text-only', name='Text only', model='text-model', model_options=['text-model'],
         ))
         dialog = RunPipelineDialog(self.window)
         for activator in dialog.module_activators:
+            if not hasattr(activator, 'menu'):
+                # The proofreading stage is a plain switch with no module menu.
+                continue
             activator.menu.rebuildMenu()
             titles = [action.menu().title() for action in activator.menu.actions() if action.menu() is not None]
             expected = ['OpenAI', 'Codex', 'Text only'] if activator.module_type == 'translator' else ['OpenAI', 'Codex']

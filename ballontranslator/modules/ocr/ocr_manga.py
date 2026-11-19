@@ -1,7 +1,7 @@
 # modified from https://github.com/kha-white/manga-ocr/blob/master/manga_ocr/ocr.py
 import re
 import jaconv
-from transformers import AutoFeatureExtractor, AutoTokenizer, LogitsProcessor, LogitsProcessorList, VisionEncoderDecoderModel
+from transformers import AutoImageProcessor, AutoTokenizer, LogitsProcessor, LogitsProcessorList, VisionEncoderDecoderModel
 import numpy as np
 import torch
 from typing import List
@@ -14,11 +14,10 @@ MANGA_OCR_PATH = r'data/models/manga-ocr-base'
 class VectorizedNoRepeatNGramLogitsProcessor(LogitsProcessor):
     """Tensor-only ``no_repeat_ngram_size`` blocking, backported from transformers main.
 
-    The pinned transformers version builds Python dicts from ``.tolist()`` at
-    every generation step, which forces a device sync per token. This bans the
-    same tokens with tensor ops only: token t is banned for a row exactly when
-    some earlier n-gram in that row starts with the row's last n-1 tokens and
-    ends with t.
+    transformers 4.x builds Python dicts from ``.tolist()`` at every generation
+    step, which forces a device sync per token. This bans the same tokens with
+    tensor ops only: token t is banned for a row exactly when some earlier
+    n-gram in that row starts with the row's last n-1 tokens and ends with t.
 
     >>> p = VectorizedNoRepeatNGramLogitsProcessor(2)
     >>> torch.isinf(p(torch.tensor([[1, 2, 1]]), torch.zeros(1, 4))).nonzero().tolist()
@@ -43,22 +42,28 @@ class VectorizedNoRepeatNGramLogitsProcessor(LogitsProcessor):
 
 
 class MangaOcr:
-    def __init__(self, pretrained_model_name_or_path=MANGA_OCR_PATH, device='cpu'):
-        self.feature_extractor = AutoFeatureExtractor.from_pretrained(pretrained_model_name_or_path)
+    def __init__(self, pretrained_model_name_or_path: str = MANGA_OCR_PATH, device: str = 'cpu') -> None:
+        # Transformers 5 reserves AutoFeatureExtractor for non-image inputs.
+        self.image_processor = AutoImageProcessor.from_pretrained(pretrained_model_name_or_path, use_fast=False)
         self.tokenizer = AutoTokenizer.from_pretrained(pretrained_model_name_or_path)
         self.model = VisionEncoderDecoderModel.from_pretrained(pretrained_model_name_or_path)
         # Swap the model's built-in n-gram blocker for the equivalent tensor-only one.
         ngram_size = self.model.generation_config.no_repeat_ngram_size or 0
+        try:
+            # The checkpoint supplies this value, so treat junk as "disabled".
+            ngram_size = int(ngram_size)
+        except (TypeError, ValueError):
+            ngram_size = 0
         self.model.generation_config.no_repeat_ngram_size = 0
         self.logits_processor = LogitsProcessorList([VectorizedNoRepeatNGramLogitsProcessor(ngram_size)] if ngram_size > 0 else [])
         self.to(device)
         
-    def to(self, device):
+    def to(self, device: str) -> None:
         self.model.to(device)
 
     @torch.no_grad()
-    def __call__(self, img: np.ndarray):
-        x = self.feature_extractor(img, return_tensors="pt").pixel_values.squeeze()
+    def __call__(self, img: np.ndarray) -> str:
+        x = self.image_processor(img, return_tensors="pt").pixel_values.squeeze()
         x = self.model.generate(x[None].to(self.model.device), logits_processor=self.logits_processor)[0].cpu()
         x = self.tokenizer.decode(x, skip_special_tokens=True)
         x = post_process(x)
@@ -76,7 +81,7 @@ def post_process(text):
 
 @register_OCR('manga_ocr')
 class MangaOCR(OCRBase):
-    dependencies = ['torch', 'transformers==4.57.6', 'jaconv', 'fugashi', 'unidic-lite']
+    dependencies = ['torch', 'transformers>=4.57.6,<6', 'jaconv', 'fugashi', 'unidic-lite']
 
     params = {
         'device': DEVICE_SELECTOR()

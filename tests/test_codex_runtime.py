@@ -225,6 +225,9 @@ class CodexRuntimeTest(unittest.TestCase):
             ),
             imsave_thread=SimpleNamespace(wait=Mock()),
             app=SimpleNamespace(quit=Mock()), run_next_dir=Mock(),
+            # No multi-pass extraction or extract-only run in this scenario.
+            _multi_extract_state=None,
+            _end_extract_only_run=Mock(),
         )
         with patch.object(shared, 'HEADLESS', True), patch.object(shared, 'args', SimpleNamespace(
             export_translation_txt=False, export_source_txt=False,

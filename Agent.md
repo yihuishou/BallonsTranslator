@@ -15,7 +15,7 @@ BallonsTranslator 是一个基于 **PyQt/qtpy** 的桌面端**漫画/图片翻�
 
 | 环节 | 能力 |
 | --- | --- |
-| 文本检测 | CTD、CTBD、YOLOv5 系列、Starriver 云端检测 |
+| 文本检测 | CTD、Koharu、YOLOv5 系列、Starriver 云端检测 |
 | OCR | MIT48px/32px、Manga-OCR、PaddleOCR-VL、Google Lens/Cloud Vision、Windows/macOS 系统 OCR、LLM 视觉 OCR |
 | 翻译 | Google/Baidu/DeepL/Yandex/Papago/Sakura/Sugoi/M2M100 等在线或本地模型，以及基于 LLM 的上下文翻译 |
 | 抹字 | LaMa、AOT、Flux、PatchMatch、LLM Inpaint 等 |
@@ -244,7 +244,7 @@ OCR           OCRBase.run_ocr(img, blk_list) → TextBlock.text（原文）
 | --- | --- |
 | `base.py` | `BaseModule`（参数、依赖、模型加载生命周期）、设备选择、torch 可用性探测、`merge_config_module_params`、注册表初始化入口 |
 | `lazy_registry.py` | AST 元数据扫描、`SafeEval`、`ModuleSpec` 校验 |
-| `textdetector/` | `TextDetectorBase` + CTD/CTBD/YOLOv5/Starriver 实现，`panel_finder.py`（分格）、`db_utils.py` |
+| `textdetector/` | `TextDetectorBase` + CTD/Koharu/YOLOv5/Starriver 实现，`panel_finder.py`（分格）、`db_utils.py` |
 | `ocr/` | `OCRBase` + `OCR` 注册表与各 OCR 后端；`utils/` 下含 Lens protobuf、ONNX OCR、ScreenAI proto |
 | `translators/` | `BaseTranslator`（含 `LANGMAP_GLOBAL`、分页/上下文/术语表契约）+ 各翻译服务；`llm_translation_contract.py` 定义 LLM 翻译结构约定 |
 | `inpaint/` | `InpainterBase` + LaMa/AOT/Flux/PatchMatch/LLM 抹字，含 diffusers 管线封装 |
