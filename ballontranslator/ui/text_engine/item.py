@@ -662,6 +662,11 @@ class TextBlkItem(QGraphicsTextItem):
             return
         override = blk.group_font_override
         self._group_override_family = override or None
+        if not override and self.is_formatting:
+            # A format write in flight already owns the fragment families and
+            # the stored family only catches up once the command finishes, so
+            # restoring it here would revert the edit and add undo entries.
+            return
         family = override or blk.fontformat.font_family
         if not family or self.layout is None:
             return
