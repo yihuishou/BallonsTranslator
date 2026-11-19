@@ -84,32 +84,13 @@ $PythonExe = Join-Path $PyLibsDir "python.exe"
 Start-Process -FilePath $PythonExe -ArgumentList "$GetPipPath --no-warn-script-location" -Wait -NoNewWindow
 Remove-Item $GetPipPath
 
-# Step 4: Download and extract uv
-$UvUrl = "https://github.com/astral-sh/uv/releases/latest/download/uv-x86_64-pc-windows-msvc.zip"
-$UvZipPath = Join-Path $BuildDir "uv.zip"
-
-Write-Host "Downloading uv..."
-Invoke-WebRequest -Uri $UvUrl -OutFile $UvZipPath
-
-Write-Host "Extracting uv..."
-$UvTempDir = Join-Path $BuildDir "uv_temp"
-Expand-Archive -Path $UvZipPath -DestinationPath $UvTempDir
-Remove-Item $UvZipPath
-
-$UvExe = Get-ChildItem -Path $UvTempDir -Filter "uv.exe" -Recurse | Select-Object -First 1
-if (-not $UvExe) {
-    throw "Could not find uv.exe in the downloaded archive"
-}
-Copy-Item -Path $UvExe.FullName -Destination $PyLibsDir -Force
-Remove-Item -Recurse -Force $UvTempDir
-
 # Clean up temp folder
 Remove-Item -Recurse -Force $BuildDir
 
 Write-Host "=== Installation Completed Successfully! ==="
 Write-Host "You can now run launch_win.bat to start BallonsTranslator."
 
-# Step 5: Automatically launch launch_win.bat
+# Step 4: Automatically launch launch_win.bat
 $LaunchBat = Join-Path $ProjectRoot "launch_win.bat"
 if (Test-Path $LaunchBat) {
     Write-Host "Launching BallonsTranslator..."
