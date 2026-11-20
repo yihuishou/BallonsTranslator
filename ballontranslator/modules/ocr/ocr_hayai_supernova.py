@@ -18,7 +18,7 @@ class HayaiOCRSupernova(OCRBase):
     256
     """
 
-    dependencies = ["torch", "transformers>=5,<6"]
+    dependencies = ["torch", "transformers>=5,<6", "jinja2>=3.1.6"]
     params = {
         "max_patches": {
             "type": "selector",

@@ -13,7 +13,7 @@ MODEL_DIR = Path(MODEL_PATH)
 
 @register_OCR('PaddleOCRVLManga')
 class PaddleOCRVLManga(OCRBase):
-    dependencies = ['torch', 'torchvision', 'transformers>=5.1,<6', 'einops']
+    dependencies = ['torch', 'torchvision', 'transformers>=5.1,<6', 'jinja2>=3.1.6', 'einops']
 
     params = {
         'device': DEVICE_SELECTOR(),

@@ -75,7 +75,7 @@ class KoharuDetector(TextDetectorBase):
     """
 
     dependencies = [
-        'torch', 'torchvision', 'rfdetr==1.7.0', 'transformers>=5.1,<6', 'safetensors',
+        'torch', 'torchvision', 'rfdetr==1.7.0', 'transformers>=5.1,<6', 'jinja2>=3.1.6', 'safetensors',
     ]
     download_file_list = [{
         'url': 'https://huggingface.co/mayocream/koharu-layout-highres/resolve/68077eb09401a46e548190ff2786bd405113ea8b/',
